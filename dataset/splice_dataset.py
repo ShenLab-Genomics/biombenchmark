@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from dataset.base_dataset import BaseDataset
 from dataset.splice_data.data_maker import IN_MAP, one_hot_encode
+from transformers import BertTokenizer, BertTokenizerFast
 
 
 class SpliceDataset(BaseDataset):
@@ -61,8 +62,14 @@ class SpTransformerDataset(SpliceDataset):
 
 
 class SpliceBERTDataset(SpliceDataset):
-    def __init__(self, h5_filename) -> None:
+    def __init__(self, h5_filename, tokenizer: BertTokenizer,
+                 max_len: int, dnabert_k: int = None, shift=0, reverse=False) -> None:
         super().__init__(h5_filename)
+        self.shift = shift
+        self.reverse = reverse
+        self.max_len = max_len
+        self.tokenizer = tokenizer
+        self.k = dnabert_k
 
     def __getitem__(self, idx):
         # 需要把输入的one-hot序列转换成Sequence形式
@@ -72,26 +79,48 @@ class SpliceBERTDataset(SpliceDataset):
 
         # X需要转换成碱基字符串
         X = np.array(self.h5f[Xk][idx]).astype('int')
-        start = (len(X) - 500)//2
-        X = X[start:start+500]
+        start = (len(X) - self.max_len)//2
+        X = X[start:start+self.max_len]
 
         BASES = 'NACGT'
-        X = ''.join(BASES[x] for x in X)
+        X = ' '.join(BASES[x] for x in X)
         # Y不需要特别转换
         Y = torch.from_numpy(self.h5f[Yk][idx]).float()
         idx = torch.max(Y[3:, :], dim=0)[0] < 0.05  # desired
         Y[0, idx] = 1
         Y[1:, idx] = 0
-        return (X, Y)
+
+        #####
+        if self.k is None:
+            input_ids = torch.tensor(self.tokenizer.encode(X))
+        else:
+            input_ids = torch.tensor(self.tokenizer.encode(
+                self.seq_to_dnabert_kmers(seq.upper(), k=self.k)))
+        mask = torch.ones_like(input_ids)
+
+        return input_ids, mask, Y
+
+    def seq_to_dnabert_kmers(self, seq, k: int):
+        kmers = list()
+        for i in range(0, len(seq) - k + 1):
+            kmers.append(seq[i:i+k])
+        return ' '.join(kmers)
 
 
 if __name__ == '__main__':
     from torch.utils.data import DataLoader
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoConfig
+    tokenizer = AutoTokenizer.from_pretrained(
+        'model/pretrained/SpliceBERT/models/SpliceBERT.510nt')
     ds = SpliceBERTDataset(
-        '/public/home/shenninggroup/yny/code/biombenchmark/dataset/splice_data/gtex_500_15tis/dataset_train_debug.h5')
+        '/public/home/shenninggroup/yny/code/biombenchmark/dataset/splice_data/gtex_500_15tis/dataset_test_debug.h5',
+        tokenizer=tokenizer,
+        max_len=500)
     dl = DataLoader(ds, batch_size=1)
     cnt = 0
-    for idx, (X, Y) in enumerate(dl):
+    for idx, (input_id, mask, Y) in enumerate(dl):
         cnt += 1
+        print(input_id)
+        print(input_id.shape)
         if cnt > 5:
             break
