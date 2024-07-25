@@ -15,23 +15,10 @@ runner：训练每个模型的代码
 
 ### All tasks
 
-| Task | Model | Data Preparation | Data Wrapper | Training | Testing | Overall Evaluation |
-| ---- | ----- | ---------------- | ------------ | -------- | ------- | ------------------ |
-| T1   | M1    | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
-| T1   | M2    | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
-| ...  | ...   | ...              | ...          | ...      | ...     | ...                |
-| T1   | M10   | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
+#### Splicing prediction
 
-| Splicing   | SpTransformer    | [ ]              | [x]          | [ ]      | [ ]     | [ ]                |
-| Splicing   | SpliceAI    | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
-| Splicing   | SpliceBERT    | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
+运行 `scripts/run_splicing_makedata.sh` 制作数据集
 
-| ...  | ...   | ...              | ...          | ...      | ...     | ...                |
-| T2   | M10   | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
-
-| T3   | M1    | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
-| T3   | M2    | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
-| ...  | ...   | ...              | ...          | ...      | ...     | ...                |
-| T3   | M10   | [ ]              | [ ]          | [ ]      | [ ]     | [ ]                |
+运行 `scripts/run_splicing_test.sh` 测试所有受支持的模型
 
 ### Results
