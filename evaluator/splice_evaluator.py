@@ -13,6 +13,11 @@ from sklearn.metrics import average_precision_score
 from sklearn.metrics import roc_auc_score, f1_score
 from scipy.stats import pearsonr
 from sklearn.model_selection import train_test_split
+from peft import (
+    LoraConfig,
+    get_peft_model,
+    get_peft_model_state_dict,
+)
 
 
 class SpliceEvaluator:
@@ -161,47 +166,46 @@ class SpliceBERTEvaluator(SpliceEvaluator):
         self.tokenizer = tokenizer
         self.tissue_num = tissue_num
 
-    def run(self):
-
-        # prepare input sequence
-        seq = "ACGUACGuacguaCGu"  # WARNING: this is just a demo. SpliceBERT may not work on sequences shorter than 64nt as it was trained on sequences of 64-1024nt in length
-        # U -> T and add whitespace
-        seq = ' '.join(list(seq.upper().replace("U", "T")))
-        # N -> 5, A -> 6, C -> 7, G -> 8, T(U) -> 9. NOTE: a [CLS] and a [SEP] token will be added to the start and the end of seq
-        input_ids = self.tokenizer.encode(seq)
-        input_ids = torch.as_tensor(input_ids)  # convert python list to Tensor
-        # add batch dimension, shape: (batch_size, sequence_length)
-        input_ids = input_ids.unsqueeze(0)
-
-        # use huggerface's official API to use SpliceBERT
-        # get nucleotide embeddings (hidden states)
-        model = AutoModel.from_pretrained(self.SPLICEBERT_PATH)  # load model
-        # get hidden states from last layer
-        last_hidden_state = model(input_ids).last_hidden_state
-        # hidden states from the embedding layer (nn.Embedding) and the 6 transformer encoder layers
-        hiddens_states = model(
-            input_ids, output_hidden_states=True).hidden_states
-
-        # get nucleotide type logits in masked language modeling
-        model = AutoModelForMaskedLM.from_pretrained(
-            self.SPLICEBERT_PATH)  # load model
-        # shape: (batch_size, sequence_length, vocab_size)
-        logits = model(input_ids).logits
-
-        # finetuning SpliceBERT for token classification tasks
-        # assume the class number is 3, shape: (batch_size, sequence_length, num_labels)
+    def run(self, data_loader: DataLoader, args):
         model = AutoModelForTokenClassification.from_pretrained(
-            self.SPLICEBERT_PATH, num_labels=3)
+            args.model_path, num_labels=self.tissue_num).to(self.device)
+        with torch.no_grad():
+            y_true = []
+            y_pred = []
+            cnt = 0
+
+            for it, (ids, mask, labels) in enumerate(tqdm.tqdm(data_loader, desc="predicting", total=len(loader))):
+                ids = ids.to(self.device)
+                mask = mask.to(self.device)
+                outputs = torch.softmax(model.forward(
+                    ids, attention_mask=mask).logits, dim=1)
+
+                outputs = outputs[:, 1:-1, :].detach().cpu().numpy()
+                cnt += 1
+                if cnt > 200:
+                    break
+                is_expr = (labels[:, 1:3, :].sum(axis=(1, 2)) >= 1)
+                y_true.append(labels[is_expr, :, :].cpu())
+                y_pred.append(outputs[is_expr, :, :].cpu())
+
+        y_pred = torch.concat(y_pred, dim=0)
+        y_true = torch.concat(y_true, dim=0)
+        y_pred = y_pred.transpose(1, 2).reshape(-1, y_pred.shape[-1]).numpy()
+        y_true = y_true.transpose(1, 2).reshape(-1, y_true.shape[-1]).numpy()
+        # TODO: evaluate
+        perform = self.evaluate(y_pred, y_true)
+        return perform
 
     def train(self, args, train_data, test_data):
         # adapted from https://github.com/chenkenbio/SpliceBERT/blob/main/examples/04-splicesite-prediction/train_splicebert_cv.py
         """
         args : resume, debug, model_path, patience
         """
-        OUT_DIR = 'model/fine_tuned/Splicing/SpliceBERT'
+        OUT_DIR = args.output_dir
         best_auc = -1
         best_epoch = -1
         fold_ckpt = dict()
+        os.makedirs(OUT_DIR, exist_ok=True)
         logger = make_logger(log_file=os.path.join(
             OUT_DIR, "train.log"), level="DEBUG" if args.debug else "INFO")
 
@@ -290,7 +294,7 @@ class SpliceBERTEvaluator(SpliceEvaluator):
                 with autocast():
                     logits = model.forward(
                         ids, attention_mask=mask).logits.squeeze(1)
-                    # print(logits.shape)
+                    print(ids.shape, logits.shape)
                     logits = logits[:, 1:-1, :]  # discard [CLS] and [SEP]
                     if torch.isnan(logits).sum() > 0:
                         raise ValueError("NaN in logits: {}".format(
@@ -356,6 +360,198 @@ class SpliceBERTEvaluator(SpliceEvaluator):
 
     def test_model(self, model: AutoModelForTokenClassification, loader: DataLoader):
         r"""
+        Return:
+        auc : float
+        f1 : float
+        pred : list
+        true : list
+        """
+        model.eval()
+        pred, true = list(), list()
+        for it, (ids, mask, label) in enumerate(tqdm.tqdm(loader, desc="predicting", total=len(loader))):
+            ids = ids.to(self.device)
+            mask = mask.to(self.device)
+            score = torch.softmax(model.forward(
+                ids, attention_mask=mask).logits, dim=1)
+
+            score = score[:, 1:-1, :].detach().cpu().numpy()
+            del ids
+            label = label.transpose(1, 2).numpy()  # discard acc/don
+            pred.append(score.astype(np.float16))
+            true.append(label.astype(np.float16))
+        y_pred = np.concatenate(pred)
+        y_true = np.concatenate(true)
+
+        print(y_pred.shape)
+        print(y_true.shape)
+
+        if self.tissue_num == 15:
+            y_pred = y_pred[:, :, :].reshape(-1)
+            y_true = y_true[:, :, 3:].reshape(-1)
+
+        auc_list = roc_auc_score(y_true.T >= 0.5, y_pred.T)
+        f1 = f1_score(y_true.T >= 0.5, y_pred.T >= 0.5)
+
+        return auc_list, f1, pred, true
+
+
+class DNABERTEvaluator(SpliceBERTEvaluator):
+    """
+    大部分可以复用SpliceBERT的流程
+    """
+
+    def __init__(self, train=False, tokenizer=None, model_path='', tissue_num=15) -> None:
+        super().__init__(train, tokenizer, model_path, tissue_num)
+
+    def run(self, data_loader: DataLoader, args):
+        pass
+
+    def train(self, args, train_data, test_data):
+        OUT_DIR = args.output_dir
+        best_auc = -1
+        best_epoch = -1
+        fold_ckpt = dict()
+        os.makedirs(OUT_DIR, exist_ok=True)
+        logger = make_logger(log_file=os.path.join(
+            OUT_DIR, "train.log"), level="DEBUG" if args.debug else "INFO")
+
+        # Load Model
+        model = AutoModelForTokenClassification.from_pretrained(
+            args.model_path, num_labels=self.tissue_num).to(self.device)
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=args.lr,
+            weight_decay=1E-6
+        )
+        scaler = GradScaler()
+        trained_epochs = 0
+
+        # Load LoRA
+        if args.use_lora:
+            lora_config = LoraConfig(
+                r=args.lora_r,
+                lora_alpha=args.lora_alpha,
+                target_modules=list(args.lora_target_modules.split(",")),
+                lora_dropout=args.lora_dropout,
+                bias="none",
+                task_type="TOKEN_CLS",
+                inference_mode=False,
+            )
+            model = get_peft_model(model, lora_config)
+            model.print_trainable_parameters()
+
+        model.train()
+        # Split train test
+        train_inds = np.arange(len(train_data))
+        train_inds, val_inds = train_test_split(
+            train_inds, test_size=0.05, random_state=0)
+        test_inds = np.arange(len(test_data))
+        if args.debug:
+            train_inds = train_inds[:100]
+            val_inds = val_inds[:100]
+            test_inds = np.random.permutation(test_inds)[:100]
+        # train
+        train_loader = DataLoader(
+            Subset(train_data, indices=train_inds),
+            batch_size=args.batch_size,
+            shuffle=True,
+            drop_last=True,
+            num_workers=args.num_workers
+        )
+        val_loader = DataLoader(
+            Subset(train_data, indices=val_inds),
+            batch_size=args.batch_size,
+            num_workers=args.num_workers
+        )
+        test_loader = DataLoader(
+            test_data,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers
+        )
+        for epoch in range(200):
+            fold = 0
+            epoch_val_auc = list()
+            epoch_val_f1 = list()
+            epoch_test_auc = list()
+            epoch_test_f1 = list()
+            pbar = tqdm.tqdm(train_loader, total=len(train_loader),
+                             desc="Epoch{}".format(epoch + trained_epochs))
+            epoch_loss = 0
+            for it, (ids, mask, label) in tqdm.tqdm(enumerate(pbar)):
+                ids, mask, label = ids.to(self.device), mask.to(
+                    self.device), label.to(self.device).float()
+                label = label.transpose(1, 2)[:, :, 3:]  # discard acc/don
+                optimizer.zero_grad()
+                with autocast():
+                    logits = model.forward(
+                        ids, attention_mask=mask).logits.squeeze(1)
+                    print(ids.shape, logits.shape)
+                    logits = logits[:, 1:-1, :]  # discard [CLS] and [SEP]
+                    if torch.isnan(logits).sum() > 0:
+                        raise ValueError("NaN in logits: {}".format(
+                            torch.isnan(logits).sum()))
+                    loss = F.binary_cross_entropy_with_logits(
+                        logits, label).mean()
+                    if torch.isnan(loss).sum() > 0:
+                        raise ValueError("NaN in loss: {}".format(
+                            torch.isnan(loss).sum()))
+
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)  # 0.step()
+                scaler.update()
+
+                epoch_loss += loss.item()
+
+                pbar.set_postfix_str("loss/lr={:.4f}/{:.2e}".format(
+                    epoch_loss / (it + 1), optimizer.param_groups[-1]["lr"]
+                ))
+
+            # validate
+            val_auc, val_f1, val_score, val_label = self.test_model(
+                model, val_loader)
+            # torch.save((val_score, val_label),
+            #            os.path.join(fold_outdir,  "val.pt"))
+            epoch_val_auc.append(val_auc)
+            epoch_val_f1.append(val_f1)
+            test_auc, test_f1, test_score, test_label = self.test_model(
+                model, test_loader)
+            # torch.save((test_score, test_label),
+            #            os.path.join(fold_outdir,  "test.pt"))
+            epoch_test_auc.append(test_auc)
+            epoch_test_f1.append(test_f1)
+            logger.info("validate/test({}-{})AUC/F1: {:.4f} {:.4f} {:.4f} {:.4f}".format(
+                epoch, fold, val_auc, val_f1, test_auc, test_f1))
+
+            torch.save({
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "scaler": scaler.state_dict(),
+                "epoch": epoch
+            }, ckpt)
+
+            logger.info("Epoch{}validation&test(AUC/F1): {:.4f} {:.4f} {:.4f} {:.4f}".format(
+                epoch,
+                np.mean(epoch_val_auc),
+                np.mean(epoch_val_f1),
+                np.mean(epoch_test_auc),
+                np.mean(epoch_test_f1)
+            ))
+
+            if np.mean(epoch_val_auc) > best_auc:
+                best_auc = np.mean(epoch_val_auc)
+                ckpt = fold_ckpt[fold]
+                shutil.copy2(ckpt, "{}.best_model.pt".format(ckpt))
+                wait = 0
+                logger.info(f"model saved, best={epoch}\n")
+            else:
+                wait += 1
+                logger.info("wait{}\n".format(wait))
+                if wait >= args.patience:
+                    break
+        pass
+
+    def test_model(self, model: AutoModelForTokenClassification, loader: DataLoader):
+        """
         Return:
         auc : float
         f1 : float

@@ -73,17 +73,18 @@ class SpliceBERTDataset(SpliceDataset):
 
     def __getitem__(self, idx):
         # 需要把输入的one-hot序列转换成Sequence形式
-        seq = ''
         Xk, idx = self.idx_to_key[idx]
         Yk = Xk.replace("X", "Y")
 
         # X需要转换成碱基字符串
         X = np.array(self.h5f[Xk][idx]).astype('int')
         start = (len(X) - self.max_len)//2
-        X = X[start:start+self.max_len]
 
-        BASES = 'NACGT'
-        X = ' '.join(BASES[x] for x in X)
+        if self.k is None:
+            X = X[start:start+self.max_len]
+        else:
+            X = X[start-1:start+self.max_len+1]  # padding
+
         # Y不需要特别转换
         Y = torch.from_numpy(self.h5f[Yk][idx]).float()
         idx = torch.max(Y[3:, :], dim=0)[0] < 0.05  # desired
@@ -91,11 +92,14 @@ class SpliceBERTDataset(SpliceDataset):
         Y[1:, idx] = 0
 
         #####
+        BASES = 'NACGT'
         if self.k is None:
+            X = ' '.join(BASES[x] for x in X)
             input_ids = torch.tensor(self.tokenizer.encode(X))
         else:
-            input_ids = torch.tensor(self.tokenizer.encode(
-                self.seq_to_dnabert_kmers(seq.upper(), k=self.k)))
+            X = ''.join(BASES[x] for x in X)
+            X = self.seq_to_dnabert_kmers(X.upper(), k=self.k)
+            input_ids = torch.tensor(self.tokenizer.encode(X))
         mask = torch.ones_like(input_ids)
 
         return input_ids, mask, Y
@@ -107,15 +111,55 @@ class SpliceBERTDataset(SpliceDataset):
         return ' '.join(kmers)
 
 
+class DNABERT2Dataset(SpliceDataset):
+    def __init__(self, h5_filename, tokenizer: BertTokenizer,
+                 max_len: int) -> None:
+        super().__init__(h5_filename)
+        self.max_len = max_len
+        self.tokenizer = tokenizer
+
+    def __getitem__(self, idx):
+        # 需要把输入的one-hot序列转换成Sequence形式
+        Xk, idx = self.idx_to_key[idx]
+        Yk = Xk.replace("X", "Y")
+
+        # X需要转换成碱基字符串
+        X = np.array(self.h5f[Xk][idx]).astype('int')
+        start = (len(X) - self.max_len)//2
+        X = X[start:start+self.max_len]
+
+        # Y不需要特别转换
+        Y = torch.from_numpy(self.h5f[Yk][idx]).float()
+        idx = torch.max(Y[3:, :], dim=0)[0] < 0.05  # desired
+        Y[0, idx] = 1
+        Y[1:, idx] = 0
+
+        BASES = 'NACGT'
+        X = ' '.join(BASES[x] for x in X)
+        input_ids = torch.tensor(self.tokenizer.encode(
+            X,
+            return_tensors="pt",
+            padding="longest",
+        ))
+        mask = torch.ones_like(input_ids)
+        return input_ids, mask, Y
+
+
 if __name__ == '__main__':
     from torch.utils.data import DataLoader
     from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoConfig
+    '''
     tokenizer = AutoTokenizer.from_pretrained(
         'model/pretrained/SpliceBERT/models/SpliceBERT.510nt')
     ds = SpliceBERTDataset(
         '/public/home/shenninggroup/yny/code/biombenchmark/dataset/splice_data/gtex_500_15tis/dataset_test_debug.h5',
         tokenizer=tokenizer,
         max_len=500)
+    '''
+    tokenizer = AutoTokenizer.from_pretrained(
+        'model/pretrained/DNABERT/DNABERT-2-117M')
+    ds = DNABERT2Dataset('/public/home/shenninggroup/yny/code/biombenchmark/dataset/splice_data/gtex_500_15tis/dataset_test_debug.h5',
+                         tokenizer=tokenizer, max_len=500)
     dl = DataLoader(ds, batch_size=1)
     cnt = 0
     for idx, (input_id, mask, Y) in enumerate(dl):

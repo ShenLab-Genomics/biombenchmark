@@ -1,0 +1,12 @@
+{
+    "vocab_size": 12,
+    "embed_dim": 768,
+    "num_attention_heads": 12,
+    "num_layers": 10,
+    "embed_positions_msa": "True",
+    "dropout": 0.1,
+    "attention_dropout": 0.1,
+    "activation_dropout": 0.1,
+    "max_tokens_per_msa": 16384,
+    "max_seqlen": 1024
+}
