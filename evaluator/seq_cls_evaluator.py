@@ -222,7 +222,7 @@ class SeqClsCollator(BaseCollator):
         self.replace_U = replace_U
 
     def __call__(self, raw_data_b):
-        print('raw:', raw_data_b)
+        # print('raw:', raw_data_b)
         input_ids_b = []
         label_b = []
         for raw_data in raw_data_b:
@@ -233,7 +233,6 @@ class SeqClsCollator(BaseCollator):
             kmer_text = seq2kmer(seq)
             # input_text = "[CLS] " + kmer_text + " [SEP]"
             input_text = "[CLS] " + kmer_text
-            print(input_text)
             input_ids = self.tokenizer(input_text)["input_ids"]
             if None in input_ids:
                 # replace all None with 0
@@ -358,7 +357,7 @@ class SeqClsTrainer(BaseTrainer):
                 labels = data["labels"].to(self.args.device)
 
                 logits = self.model(input_ids)
-                print(logits.shape, labels.shape)
+                # print(logits.shape, labels.shape)
                 loss = self.loss_fn(logits, labels)
 
                 # clear grads
@@ -399,7 +398,7 @@ class SeqClsTrainer(BaseTrainer):
                 labels_dataset.append(labels)
 
                 if num_total >= self.args.logging_steps:
-                    pbar.update(self.args.logging_steps)
+                    pbar.update(num_total)
                     num_total = 0
 
         outputs_dataset = torch.concat(outputs_dataset, axis=0)

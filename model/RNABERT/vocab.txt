@@ -1,0 +1,6 @@
+[PAD]
+[CLS]
+A
+U
+G
+C
