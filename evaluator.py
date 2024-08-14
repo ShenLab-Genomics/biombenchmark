@@ -1,4 +1,4 @@
-from evaluator.splice_evaluator import SpTransformerEvaluator
+from evaluator.splice_evaluator_old import SpTransformerEvaluator
 from dataset.splice_dataset import SpTransformerDataset
 from torch.utils.data import DataLoader
 import torch

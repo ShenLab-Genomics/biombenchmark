@@ -1,12 +1,12 @@
 import argparse
-from evaluator import splice_evaluator
+from evaluator import splice_evaluator_old
 from dataset import splice_dataset
 from transformers import AutoTokenizer
 
 
 def train_splice_SpliceBERT(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    ev = splice_evaluator.SpliceBERTEvaluator(train=True, tissue_num=15,
+    ev = splice_evaluator_old.SpliceBERTEvaluator(train=True, tissue_num=15,
                                               model_path=args.model_path,
                                               tokenizer=tokenizer)
     train_dataset = splice_dataset.SpliceBERTDataset(
@@ -27,7 +27,7 @@ def train_splice_DNABERT(args):
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path)
     print('done')
-    ev = splice_evaluator.DNABERTEvaluator(
+    ev = splice_evaluator_old.DNABERTEvaluator(
         train=True, tissue_num=15,
         model_path=args.model_path,
         tokenizer=tokenizer

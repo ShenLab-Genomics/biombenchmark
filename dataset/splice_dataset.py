@@ -37,6 +37,23 @@ class SpliceDataset(BaseDataset):
         raise NotImplementedError
 
 
+class SpliceNormalDataset(BaseDataset):
+    def __getitem__(self, idx):
+        """
+        Output:
+            X: (4, context + center + context) shaped array
+            Y: (dim, center) shaped array
+        """
+        Xk, idx = self.idx_to_key[idx]
+        Yk = Xk.replace("X", "Y")
+        X = self.h5f[Xk][idx]
+        Y = torch.from_numpy(self.h5f[Yk][idx]).float()
+        idx = torch.max(Y[3:, :], dim=0)[0] < 0.05  # desired
+        Y[0, idx] = 1
+        Y[1:, idx] = 0
+        return (X, Y)
+
+
 class SpTransformerDataset(SpliceDataset):
     def __init__(self, h5_filename) -> None:
         super().__init__(h5_filename)

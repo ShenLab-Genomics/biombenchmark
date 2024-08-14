@@ -1,39 +1,70 @@
-import os
-import tqdm
+from tqdm import tqdm
+import time
+from collections import defaultdict
 import torch
 import numpy as np
-import shutil
-from torch.utils.data import DataLoader, Subset
-from torch.cuda.amp import autocast, GradScaler
-import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModel, AutoModelForMaskedLM, AutoModelForTokenClassification
-from model.SpTransformer.sptransformer import Ex2
-from model.utils import make_logger
-from sklearn.metrics import average_precision_score
-from sklearn.metrics import roc_auc_score, f1_score
-from scipy.stats import pearsonr
-from sklearn.model_selection import train_test_split
-from peft import (
-    LoraConfig,
-    get_peft_model,
-    get_peft_model_state_dict,
-)
 
+from model.BERT_like import RNATokenizer
+from model.RNABERT.bert import get_config
+from model.RNABERT.rnabert import BertModel
+from model.RNAMSM.model import MSATransformer
+import model.RNAFM.fm as fm
+from model.BERT_like import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss
+from model.wrap_for_cls import DNABERTForSeqCls
+from torch.optim import AdamW
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
+from sklearn.metrics import average_precision_score,roc_auc_score
 
-class SpliceEvaluator:
-    """
-    Splicing任务需要设置tissue_num，以决定在包含多少个tissue数据的数据集中测试
-    暂定分三个任务： tissue_num = 0, 15, 53, 即不考虑组织特异性，考虑15个主要组织的特异性，以及考虑全部GTEx组织的特异性
-    """
+class SpliceMetrics(BaseMetrics):
+    def __call__(self, outputs, labels):
+        """
+        Args:
+            outputs: logits in tensor
+            labels: labels in tensor
+        Returns:
+            metrics in dict
+        """
+        pred_dim = outputs.shape[-1]
+        res = {}
+        if pred_dim == 3:
+            # neither / acceptor / donor
+            # calculate class 1 and 2
+            outputs = outputs[:, 1:]
+            labels = labels[:, 1:]
 
-    def __init__(self) -> None:
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
+        elif pred_dim == 18 or pred_dim == 54:
+
+            if pred_dim == 18:
+                # 3 classes and 15 tissues
+                # calculate 15 tissues separately
+                outputs = outputs[:, 3:]
+                labels = labels[:, 3:]
+                pass
+
+            if pred_dim == 54:
+                # 3 classes and 51 tissues
+                # calculate 51 tissues separately
+                outputs = outputs[:, 3:]
+                labels = labels[:, 3:]
+                pass
+
         else:
-            self.device = torch.device("cpu")
-        pass
+            raise ValueError("Invalid prediction dimension.")
+        
+        for name in self.metrics:
+            func = getattr(self, name)
+            if func:
+                for i in range(outputs.shape[1]):
+                    m = func(outputs[:, i], labels[:, i])
+                    res[name + '_' + str(i)] = m
+                m = func(outputs, labels)
+            else:
+                raise NotImplementedError
+            res[name] = m
+        return res
 
-    def get_topl_statistics(self, y_pred, y_true):
+    def topk(self, preds, labels):
         '''
         Parameters
         ---
@@ -43,545 +74,248 @@ class SpliceEvaluator:
         Returns
         ---
             topkl_accuracy: float, the calculated topkl accuracy
-            auprc:      float , the calculated pearson value
-            pearson:    tuple , the calculated pearson correlation
         '''
-        idx_true = np.nonzero(y_true >= 0.5)[0]
-        argsorted_y_pred = np.argsort(y_pred)
-        sorted_y_pred = y_pred[argsorted_y_pred]
+        idx_true = np.nonzero(labels >= 0.5)[0]
+        argsorted_y_pred = np.argsort(preds)
+        sorted_y_pred = preds[argsorted_y_pred]
 
-        threshold = []
         # Get top-1L index
         idx_pred = argsorted_y_pred[-int(1 * len(idx_true)):]
         if len(idx_true) <= 0:
             raise ValueError("No positive data!")
-
+        
         topkl_accuracy = np.size(np.intersect1d(
             idx_true, idx_pred)) / float(min(len(idx_pred), len(idx_true)))
+        
         threshold = sorted_y_pred[-int(1 * len(idx_true))]
 
-        auprc = average_precision_score(y_true >= 0.5, y_pred)
-        pearson = pearsonr(y_true, y_pred)
-
-        return topkl_accuracy, auprc, pearson
-
-    def _evaluate(self, y_pred, y_true, tissue_num=15):
-        topkl = []
-        auprc = []
-        pearson = []
-
-        if tissue_num == 0:
-            # No tissue, just distinguish acceptor/donor
-            pass
-        elif tissue_num == 15:
-            # Usage of 15 tissues
-            for idx in range(15):
-                r1, r2, r3 = self.get_topl_statistics(
-                    y_pred[idx, :], y_true[idx, :])
-                topkl.append(r1)
-                auprc.append(r2)
-                pearson.append(r3)
-
-        elif tissue_num == 54:
-            # Usage of 54 tissues
-            pass
-
-        return topkl, auprc, pearson
-
-
-class SpTransformerEvaluator(SpliceEvaluator):
-
-    def __init__(self, model_weight='', tissue_num=15) -> None:
-        super().__init__()
-        self.tissue_num = tissue_num
-        if tissue_num == 15:
-            self.model = Ex2(128, context_len=4750, tissue_num=tissue_num,
-                             max_seq_len=8192, attn_depth=8, training=False)
-        elif tissue_num == 0:
-            raise NotImplementedError
-        elif tissue_num == 54:
-            raise NotImplementedError
-
-        save_dict = torch.load(
-            model_weight, map_location='cpu')
-        self.model.load_state_dict(save_dict["state_dict"])
-        self.model.to(self.device).eval()
-
-    def run(self, data_loader: DataLoader):
-
-        with torch.no_grad():
-            y_true = []
-            y_pred = []
-            cnt = 0
-            for inputs, labels in tqdm.tqdm(data_loader, mininterval=5):
-                cnt += 1
-                if cnt > 200:
-                    break
-                inputs = inputs.to(self.device)
-                labels = labels.to(self.device)
-                outputs = self.model(inputs)
-                outputs[:, :3, :] = torch.softmax(outputs[:, :3, :], dim=1)
-                outputs[:, 3:, :] = torch.sigmoid(outputs[:, 3:, :])
-                is_expr = (labels[:, 1:3, :].sum(axis=(1, 2)) >= 1)
-                y_true.append(labels[is_expr, :, :].cpu())
-                y_pred.append(outputs[is_expr, :, :].cpu())
-
-                # index = torch.where(torch.sum(labels[:, 1:3, :], dim=1) > 0)
-                # y_true.append(labels[index[0], :, index[1]].cpu().detach())
-                # y_pred.append(outputs[index[0], :, index[1]].cpu().detach())
-
-        y_pred = torch.concat(y_pred, dim=0)
-        y_true = torch.concat(y_true, dim=0)
-        y_pred = y_pred.transpose(1, 2).reshape(-1, y_pred.shape[-1]).numpy()
-        y_true = y_true.transpose(1, 2).reshape(-1, y_true.shape[-1]).numpy()
-        # TODO: evaluate
-        perform = self.evaluate(y_pred, y_true)
-        return perform
-
-    def evaluate(self, y_pred, y_true):
-        if self.tissue_num == 15:
-            y_pred = y_pred[:, 3:]
-            y_true = y_true[:, 3:]
-        topkl, auprc, pearson = self._evaluate(
-            y_pred, y_true, tissue_num=self.tissue_num)
-        # auprc, pearson, precision, recall, _ = None
-        performance_dict = {
-            'TopL': topkl,
-            'PRAUC': auprc,
-            'pearsonr': pearson
+        return {
+            'topkl': topkl_accuracy,
+            'threshold': threshold
         }
-        return performance_dict
+
+    def pr_auc(self, preds, labels):
+        '''
+        Parameters
+        ---
+            y_true:     1-dim array, label for one of the tissues
+            y_pred:     1-dim array, model output for the tissue
+
+        Returns
+        ---
+            auprc:      float , the calculated auprc value
+        '''
+        auprc = average_precision_score(labels >= 0.5, preds)
+        return auprc
+
+    def roc_auc(self, preds, labels):
+        auroc = roc_auc_score(labels >= 0.5, preds)
+        return auroc
+
+
+class SpliceTrainer(BaseTrainer):
+    def train(self, epoch):
+        self.model.train()
+        time_st = time.time()
+        num_total, loss_total = 0, 0
+
+        with tqdm(total=len(self.train_dataset)) as pbar:
+            for i, data in enumerate(self.train_dataloader):
+                # for non-language model, the "input_ids" represents the one-hot encoding of the sequence
+                input_ids = data["input_ids"].to(self.args.device)
+                labels = data["labels"].to(self.args.device)
+
+                logits = self.model(input_ids)
+                loss = self.loss_fn(logits, labels)
+
+                # clear grads
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+
+                # log to pbar
+                num_total += self.args.batch_size
+                loss_total += loss.item()
+
+                # reset loss if too many steps
+                if num_total >= self.args.logging_steps:
+                    pbar.set_postfix(train_loss='{:.4f}'.format(
+                        loss_total / num_total))
+                    pbar.update(num_total)
+                    num_total, loss_total = 0, 0
+
+        time_ed = time.time() - time_st
+        print('Train\tLoss: {:.6f}; Time: {:.4f}s'.format(
+            loss.item(), time_ed))
+
+    def eval(self, epoch):
+        self.model.eval()
+        time_st = time.time()
+        num_total = 0
+        with tqdm(total=len(self.eval_dataset)) as pbar:
+            outputs_dataset, labels_dataset = [], []
+            for i, data in enumerate(self.eval_dataloader):
+                input_ids = data["input_ids"].to(self.args.device)
+                labels = data["labels"].to(self.args.device)
+
+                with torch.no_grad():
+                    logits = self.model(input_ids)
+
+                outputs_dataset.append(logits)
+                labels_dataset.append(labels)
+
+                if num_total >= self.args.logging_steps:
+                    pbar.update(num_total)
+                    num_total = 0
+
+        outputs_dataset = torch.concat(outputs_dataset, axis=0)
+        labels_dataset = torch.concat(labels_dataset, axis=0)
+        # save best model
+        metrics_dataset = self.compute_metrics(outputs_dataset, labels_dataset)
+
+        # log results to screen/bash
+        results = {}
+        log = 'Test\t' + self.args.dataset + "\t"
+        # log results to visualdl
+        tag_value = defaultdict(float)
+        # extract results
+        for k, v in metrics_dataset.items():
+            log += k + ": {" + k + ":.4f}\t"
+            results[k] = v
+            tag = "eval/" + k
+            tag_value[tag] = v
+
+        time_ed = time.time() - time_st
+        print(log.format(**results), "; Time: {:.4f}s".format(time_ed))
+
+
+class SpliceTokenCollator(BaseCollator):
+    def __init__(self, max_seq_len, tokenizer, replace_T=True, replace_U=False, use_kmer=True, overflow=0):
+        super().__init__()
+        self.max_seq_len = max_seq_len
+        self.tokenizer = tokenizer
+        assert replace_T ^ replace_U, "Only replace T or U."
+        self.replace_T = replace_T
+        self.replace_U = replace_U
+        self.use_kmer = use_kmer
+        self.overflow = overflow
+
+    def __call__(self, raw_data):
+        input_ids_stack = []
+        labels_stack = []
+
+        for data in raw_data:
+            seq = data[0]
+            seq = seq.upper()
+            seq = seq.replace(
+                "T", "U") if self.replace_T else seq.replace("U", "T")
+
+            start = (len(seq) - self.max_seq_len)//2
+            if self.use_kmer:
+                seq = seq[start-self.overflow:start +
+                          self.max_seq_len+self.overflow]
+            else:
+                seq = seq[start:start+self.max_seq_len]
+
+            input_text = "[CLS] " + seq
+            input_ids = self.tokenizer(input_text)["input_ids"]
+            input_ids_stack.append(input_ids)
+
+            label = data[1]
+            labels_stack.append(label)
+
+        return {
+            "input_ids": torch.from_numpy(self.stack_fn(input_ids_stack)),
+            "labels": torch.from_numpy(self.stack_fn(labels_stack))}
+
+
+class SpliceOneHotCollator(BaseCollator):
+    IN_MAP = np.asarray([[0, 0, 0, 0],
+                         [1, 0, 0, 0],
+                         [0, 1, 0, 0],
+                         [0, 0, 1, 0],
+                         [0, 0, 0, 1]])
+    # One-hot encoding of the inputs: 0 is for padding, and 1, 2, 3, 4 correspond
+    # to A, C, G, T respectively.
+
+    OUT_MAP = np.asarray([[1, 0, 0],
+                          [0, 1, 0],
+                          [0, 0, 1],
+                          [0, 0, 0]])
+    # One-hot encoding of the outputs: 0 is for no splice, 1 is for acceptor,
+    # 2 is for donor and -1 is for padding.
+
+    @staticmethod
+    def one_hot_encode(X, use_map):
+        return use_map[X.astype('int8')]
+
+    def __init__(self, max_seq_len, tokenizer, replace_T=True, replace_U=False, use_kmer=True, overflow=0):
+        super().__init__()
+        self.max_seq_len = max_seq_len
+        self.tokenizer = tokenizer
+        assert replace_U, "Only use ACGT."
+
+    def __call__(self, raw_data):
+        input_ids_stack = []
+        labels_stack = []
+        for data in raw_data:
+            seq = data[0]
+            seq = seq.upper()
+            seq = seq.replace("U", "T")
+            start = (len(seq) - self.max_seq_len)//2
+            seq = seq[start:start+self.max_seq_len]
+            input_ids = self.one_hot_encode(seq, self.IN_MAP)
+            input_ids_stack.append(input_ids)
+            labels_stack.append(data[1])
+        return {
+            "input_ids": torch.from_numpy(self.stack_fn(input_ids_stack)).transpose(1, 2),
+            "labels": torch.from_numpy(self.stack_fn(labels_stack))}
+
+
+class SpliceEvaluator:
+    def __init__(self, args, tokenizer=None) -> None:
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
+        self.tokenizer = tokenizer
+        self.token_cls_trainer = None
+
+    def buildTrainer(self, args):
+        self._loss_fn = SeqClsLoss().to(self.device)
+        self._collate_fn = SpliceOneHotCollator(
+            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U)
+        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        self._metric = SpliceMetrics(metrics=args.metrics)
+
+    def run(self, args, train_data, eval_data):
+        self.buildTrainer(args)
+        args.device = self.device
+        self.token_cls_trainer = SpliceTrainer(
+            args=args,
+            model=self.model,
+            train_dataset=train_data,
+            eval_dataset=eval_data,
+            data_collator=self._collate_fn,
+            loss_fn=self._loss_fn,
+            optimizer=self._optimizer,
+            compute_metrics=self._metric,
+        )
+        for i_epoch in range(args.num_train_epochs):
+            print("Epoch: {}".format(i_epoch))
+            self.token_cls_trainer.train(i_epoch)
+            self.token_cls_trainer.eval(i_epoch)
 
 
 class SpliceBERTEvaluator(SpliceEvaluator):
-    """
-    The code was adapted from https://github.com/chenkenbio/SpliceBERT?tab=readme-ov-file#how-to-use-splicebert
-    """
-
-    def __init__(self, train=False, tokenizer=None, model_path='', tissue_num=15) -> None:
-        super().__init__()
+    def __init__(self, args, tokenizer=None, class_num=2):
+        super().__init__(args, tokenizer)
         # set the path to the folder of pre-trained SpliceBERT
-        self.SPLICEBERT_PATH = model_path
+        self.SPLICEBERT_PATH = args.model_path
         # load tokenizer
         self.tokenizer = tokenizer
-        self.tissue_num = tissue_num
+        self.class_num = class_num
+        self.model = AutoModelForTokenClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num).to(self.device)
 
-    def run(self, data_loader: DataLoader, args):
-        model = AutoModelForTokenClassification.from_pretrained(
-            args.model_path, num_labels=self.tissue_num).to(self.device)
-        with torch.no_grad():
-            y_true = []
-            y_pred = []
-            cnt = 0
-
-            for it, (ids, mask, labels) in enumerate(tqdm.tqdm(data_loader, desc="predicting", total=len(loader))):
-                ids = ids.to(self.device)
-                mask = mask.to(self.device)
-                outputs = torch.softmax(model.forward(
-                    ids, attention_mask=mask).logits, dim=1)
-
-                outputs = outputs[:, 1:-1, :].detach().cpu().numpy()
-                cnt += 1
-                if cnt > 200:
-                    break
-                is_expr = (labels[:, 1:3, :].sum(axis=(1, 2)) >= 1)
-                y_true.append(labels[is_expr, :, :].cpu())
-                y_pred.append(outputs[is_expr, :, :].cpu())
-
-        y_pred = torch.concat(y_pred, dim=0)
-        y_true = torch.concat(y_true, dim=0)
-        y_pred = y_pred.transpose(1, 2).reshape(-1, y_pred.shape[-1]).numpy()
-        y_true = y_true.transpose(1, 2).reshape(-1, y_true.shape[-1]).numpy()
-        # TODO: evaluate
-        perform = self.evaluate(y_pred, y_true)
-        return perform
-
-    def train(self, args, train_data, test_data):
-        # adapted from https://github.com/chenkenbio/SpliceBERT/blob/main/examples/04-splicesite-prediction/train_splicebert_cv.py
-        """
-        args : resume, debug, model_path, patience
-        """
-        OUT_DIR = args.output_dir
-        best_auc = -1
-        best_epoch = -1
-        fold_ckpt = dict()
-        os.makedirs(OUT_DIR, exist_ok=True)
-        logger = make_logger(log_file=os.path.join(
-            OUT_DIR, "train.log"), level="DEBUG" if args.debug else "INFO")
-
-        # Split train test
-        train_inds = np.arange(len(train_data))
-        train_inds, val_inds = train_test_split(
-            train_inds, test_size=0.05, random_state=0)
-        test_inds = np.arange(len(test_data))
-        if args.debug:
-            train_inds = train_inds[:100]
-            val_inds = val_inds[:100]
-            test_inds = np.random.permutation(test_inds)[:100]
-        ##
-        for epoch in range(200):
-            fold = 0
-            epoch_val_auc = list()
-            epoch_val_f1 = list()
-            epoch_test_auc = list()
-            epoch_test_f1 = list()
-            # setup dataset
-            fold_outdir = os.path.join(OUT_DIR, "fold{}".format(fold))
-            os.makedirs(fold_outdir, exist_ok=True)
-            ckpt = os.path.join(fold_outdir, "checkpoint.pt")
-
-            train_loader = DataLoader(
-                Subset(train_data, indices=train_inds),
-                batch_size=args.batch_size,
-                shuffle=True,
-                drop_last=True,
-                num_workers=args.num_workers
-            )
-            val_loader = DataLoader(
-                Subset(train_data, indices=val_inds),
-                batch_size=args.batch_size,
-                num_workers=args.num_workers
-            )
-            test_loader = DataLoader(
-                test_data,
-                batch_size=args.batch_size,
-                num_workers=args.num_workers
-            )
-            # setup model, optimizer & scaler
-            if epoch > 0 or (args.resume and os.path.exists(ckpt)):
-                if epoch > 0:
-                    del model, optimizer, scaler
-                d = torch.load(ckpt)
-                model = AutoModelForTokenClassification.from_pretrained(
-                    args.model_path, num_labels=self.tissue_num).to(self.device)
-                model.load_state_dict(d["model"])
-                optimizer = torch.optim.AdamW(
-                    model.parameters(),
-                    lr=args.lr,
-                    weight_decay=1E-6
-                )
-                optimizer.load_state_dict(d["optimizer"])
-                scaler = GradScaler()
-                scaler.load_state_dict(d["scaler"])
-                if epoch == 0:
-                    trained_epochs = d.get("epoch", -1) + 1
-            else:
-                model = AutoModelForTokenClassification.from_pretrained(
-                    args.model_path, num_labels=self.tissue_num).to(self.device)
-                optimizer = torch.optim.AdamW(
-                    model.parameters(),
-                    lr=args.lr,
-                    weight_decay=1E-6
-                )
-                torch.save((train_inds, val_inds, test_inds),
-                           "{}/split.pt".format(OUT_DIR))
-                scaler = GradScaler()
-                trained_epochs = 0
-
-            model.train()
-            # train
-            pbar = tqdm.tqdm(train_loader,
-                             total=len(train_loader),
-                             desc="Epoch{}-{}".format(epoch +
-                                                      trained_epochs, fold)
-                             )
-            epoch_loss = 0
-            for it, (ids, mask, label) in tqdm.tqdm(enumerate(pbar)):
-                ids, mask, label = ids.to(self.device), mask.to(
-                    self.device), label.to(self.device).float()
-                label = label.transpose(1, 2)[:, :, 3:]  # discard acc/don
-                optimizer.zero_grad()
-                with autocast():
-                    logits = model.forward(
-                        ids, attention_mask=mask).logits.squeeze(1)
-                    print(ids.shape, logits.shape)
-                    logits = logits[:, 1:-1, :]  # discard [CLS] and [SEP]
-                    if torch.isnan(logits).sum() > 0:
-                        raise ValueError("NaN in logits: {}".format(
-                            torch.isnan(logits).sum()))
-                    loss = F.binary_cross_entropy_with_logits(
-                        logits, label).mean()
-                    if torch.isnan(loss).sum() > 0:
-                        raise ValueError("NaN in loss: {}".format(
-                            torch.isnan(loss).sum()))
-
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)  # 0.step()
-                scaler.update()
-
-                epoch_loss += loss.item()
-
-                pbar.set_postfix_str("loss/lr={:.4f}/{:.2e}".format(
-                    epoch_loss / (it + 1), optimizer.param_groups[-1]["lr"]
-                ))
-
-            # validate
-            val_auc, val_f1, val_score, val_label = self.test_model(
-                model, val_loader)
-            # torch.save((val_score, val_label),
-            #            os.path.join(fold_outdir,  "val.pt"))
-            epoch_val_auc.append(val_auc)
-            epoch_val_f1.append(val_f1)
-            test_auc, test_f1, test_score, test_label = self.test_model(
-                model, test_loader)
-            # torch.save((test_score, test_label),
-            #            os.path.join(fold_outdir,  "test.pt"))
-            epoch_test_auc.append(test_auc)
-            epoch_test_f1.append(test_f1)
-            logger.info("validate/test({}-{})AUC/F1: {:.4f} {:.4f} {:.4f} {:.4f}".format(
-                epoch, fold, val_auc, val_f1, test_auc, test_f1))
-
-            torch.save({
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "scaler": scaler.state_dict(),
-                "epoch": epoch
-            }, ckpt)
-
-            logger.info("Epoch{}validation&test(AUC/F1): {:.4f} {:.4f} {:.4f} {:.4f}".format(
-                epoch,
-                np.mean(epoch_val_auc),
-                np.mean(epoch_val_f1),
-                np.mean(epoch_test_auc),
-                np.mean(epoch_test_f1)
-            ))
-
-            if np.mean(epoch_val_auc) > best_auc:
-                best_auc = np.mean(epoch_val_auc)
-                ckpt = fold_ckpt[fold]
-                shutil.copy2(ckpt, "{}.best_model.pt".format(ckpt))
-                wait = 0
-                logger.info(f"model saved, best={epoch}\n")
-            else:
-                wait += 1
-                logger.info("wait{}\n".format(wait))
-                if wait >= args.patience:
-                    break
-
-    def test_model(self, model: AutoModelForTokenClassification, loader: DataLoader):
-        r"""
-        Return:
-        auc : float
-        f1 : float
-        pred : list
-        true : list
-        """
-        model.eval()
-        pred, true = list(), list()
-        for it, (ids, mask, label) in enumerate(tqdm.tqdm(loader, desc="predicting", total=len(loader))):
-            ids = ids.to(self.device)
-            mask = mask.to(self.device)
-            score = torch.softmax(model.forward(
-                ids, attention_mask=mask).logits, dim=1)
-
-            score = score[:, 1:-1, :].detach().cpu().numpy()
-            del ids
-            label = label.transpose(1, 2).numpy()  # discard acc/don
-            pred.append(score.astype(np.float16))
-            true.append(label.astype(np.float16))
-        y_pred = np.concatenate(pred)
-        y_true = np.concatenate(true)
-
-        print(y_pred.shape)
-        print(y_true.shape)
-
-        if self.tissue_num == 15:
-            y_pred = y_pred[:, :, :].reshape(-1)
-            y_true = y_true[:, :, 3:].reshape(-1)
-
-        auc_list = roc_auc_score(y_true.T >= 0.5, y_pred.T)
-        f1 = f1_score(y_true.T >= 0.5, y_pred.T >= 0.5)
-
-        return auc_list, f1, pred, true
-
-
-class DNABERTEvaluator(SpliceBERTEvaluator):
-    """
-    大部分可以复用SpliceBERT的流程
-    """
-
-    def __init__(self, train=False, tokenizer=None, model_path='', tissue_num=15) -> None:
-        super().__init__(train, tokenizer, model_path, tissue_num)
-
-    def run(self, data_loader: DataLoader, args):
-        pass
-
-    def train(self, args, train_data, test_data):
-        OUT_DIR = args.output_dir
-        best_auc = -1
-        best_epoch = -1
-        fold_ckpt = dict()
-        os.makedirs(OUT_DIR, exist_ok=True)
-        logger = make_logger(log_file=os.path.join(
-            OUT_DIR, "train.log"), level="DEBUG" if args.debug else "INFO")
-
-        # Load Model
-        model = AutoModelForTokenClassification.from_pretrained(
-            args.model_path, num_labels=self.tissue_num).to(self.device)
-        optimizer = torch.optim.AdamW(
-            model.parameters(),
-            lr=args.lr,
-            weight_decay=1E-6
-        )
-        scaler = GradScaler()
-        trained_epochs = 0
-
-        # Load LoRA
-        if args.use_lora:
-            lora_config = LoraConfig(
-                r=args.lora_r,
-                lora_alpha=args.lora_alpha,
-                target_modules=list(args.lora_target_modules.split(",")),
-                lora_dropout=args.lora_dropout,
-                bias="none",
-                task_type="TOKEN_CLS",
-                inference_mode=False,
-            )
-            model = get_peft_model(model, lora_config)
-            model.print_trainable_parameters()
-
-        model.train()
-        # Split train test
-        train_inds = np.arange(len(train_data))
-        train_inds, val_inds = train_test_split(
-            train_inds, test_size=0.05, random_state=0)
-        test_inds = np.arange(len(test_data))
-        if args.debug:
-            train_inds = train_inds[:100]
-            val_inds = val_inds[:100]
-            test_inds = np.random.permutation(test_inds)[:100]
-        # train
-        train_loader = DataLoader(
-            Subset(train_data, indices=train_inds),
-            batch_size=args.batch_size,
-            shuffle=True,
-            drop_last=True,
-            num_workers=args.num_workers
-        )
-        val_loader = DataLoader(
-            Subset(train_data, indices=val_inds),
-            batch_size=args.batch_size,
-            num_workers=args.num_workers
-        )
-        test_loader = DataLoader(
-            test_data,
-            batch_size=args.batch_size,
-            num_workers=args.num_workers
-        )
-        for epoch in range(200):
-            fold = 0
-            epoch_val_auc = list()
-            epoch_val_f1 = list()
-            epoch_test_auc = list()
-            epoch_test_f1 = list()
-            pbar = tqdm.tqdm(train_loader, total=len(train_loader),
-                             desc="Epoch{}".format(epoch + trained_epochs))
-            epoch_loss = 0
-            for it, (ids, mask, label) in tqdm.tqdm(enumerate(pbar)):
-                ids, mask, label = ids.to(self.device), mask.to(
-                    self.device), label.to(self.device).float()
-                label = label.transpose(1, 2)[:, :, 3:]  # discard acc/don
-                optimizer.zero_grad()
-                with autocast():
-                    logits = model.forward(
-                        ids, attention_mask=mask).logits.squeeze(1)
-                    print(ids.shape, logits.shape)
-                    logits = logits[:, 1:-1, :]  # discard [CLS] and [SEP]
-                    if torch.isnan(logits).sum() > 0:
-                        raise ValueError("NaN in logits: {}".format(
-                            torch.isnan(logits).sum()))
-                    loss = F.binary_cross_entropy_with_logits(
-                        logits, label).mean()
-                    if torch.isnan(loss).sum() > 0:
-                        raise ValueError("NaN in loss: {}".format(
-                            torch.isnan(loss).sum()))
-
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)  # 0.step()
-                scaler.update()
-
-                epoch_loss += loss.item()
-
-                pbar.set_postfix_str("loss/lr={:.4f}/{:.2e}".format(
-                    epoch_loss / (it + 1), optimizer.param_groups[-1]["lr"]
-                ))
-
-            # validate
-            val_auc, val_f1, val_score, val_label = self.test_model(
-                model, val_loader)
-            # torch.save((val_score, val_label),
-            #            os.path.join(fold_outdir,  "val.pt"))
-            epoch_val_auc.append(val_auc)
-            epoch_val_f1.append(val_f1)
-            test_auc, test_f1, test_score, test_label = self.test_model(
-                model, test_loader)
-            # torch.save((test_score, test_label),
-            #            os.path.join(fold_outdir,  "test.pt"))
-            epoch_test_auc.append(test_auc)
-            epoch_test_f1.append(test_f1)
-            logger.info("validate/test({}-{})AUC/F1: {:.4f} {:.4f} {:.4f} {:.4f}".format(
-                epoch, fold, val_auc, val_f1, test_auc, test_f1))
-
-            torch.save({
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "scaler": scaler.state_dict(),
-                "epoch": epoch
-            }, ckpt)
-
-            logger.info("Epoch{}validation&test(AUC/F1): {:.4f} {:.4f} {:.4f} {:.4f}".format(
-                epoch,
-                np.mean(epoch_val_auc),
-                np.mean(epoch_val_f1),
-                np.mean(epoch_test_auc),
-                np.mean(epoch_test_f1)
-            ))
-
-            if np.mean(epoch_val_auc) > best_auc:
-                best_auc = np.mean(epoch_val_auc)
-                ckpt = fold_ckpt[fold]
-                shutil.copy2(ckpt, "{}.best_model.pt".format(ckpt))
-                wait = 0
-                logger.info(f"model saved, best={epoch}\n")
-            else:
-                wait += 1
-                logger.info("wait{}\n".format(wait))
-                if wait >= args.patience:
-                    break
-        pass
-
-    def test_model(self, model: AutoModelForTokenClassification, loader: DataLoader):
-        """
-        Return:
-        auc : float
-        f1 : float
-        pred : list
-        true : list
-        """
-        model.eval()
-        pred, true = list(), list()
-        for it, (ids, mask, label) in enumerate(tqdm.tqdm(loader, desc="predicting", total=len(loader))):
-            ids = ids.to(self.device)
-            mask = mask.to(self.device)
-            score = torch.softmax(model.forward(
-                ids, attention_mask=mask).logits, dim=1)
-
-            score = score[:, 1:-1, :].detach().cpu().numpy()
-            del ids
-            label = label.transpose(1, 2).numpy()  # discard acc/don
-            pred.append(score.astype(np.float16))
-            true.append(label.astype(np.float16))
-        y_pred = np.concatenate(pred)
-        y_true = np.concatenate(true)
-
-        print(y_pred.shape)
-        print(y_true.shape)
-
-        if self.tissue_num == 15:
-            y_pred = y_pred[:, :, :].reshape(-1)
-            y_true = y_true[:, :, 3:].reshape(-1)
-
-        auc_list = roc_auc_score(y_true.T >= 0.5, y_pred.T)
-        f1 = f1_score(y_true.T >= 0.5, y_pred.T >= 0.5)
-
-        return auc_list, f1, pred, true
+    pass

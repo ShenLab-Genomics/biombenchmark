@@ -24,7 +24,7 @@ class SeqClsDataset(Dataset):
         instance = self.data[idx]
         seq = instance[0]
         label = instance[1]
-        print(seq)
+        # print(seq)
         return {"seq": seq, "label": label}
 
     def __len__(self):
