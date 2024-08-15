@@ -1,0 +1,149 @@
+source_data:
+  sample_list: './required_files/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt' # tissue type annotation
+  paralog_data: './required_files/mart_export_paralog.txt' # To exclude paralog from test dataset
+  gene_strand_data: './required_files/mart_export_strand.txt' # gene strand annotation
+  data_path : '/public/home/shenninggroup/yny/data/gtexv8' # raw data path (not required)
+
+ref_genome: ./required_files/hg38.fa # reference genome
+tissue_data_folder: ./gtex_500_53tis # output
+context_len: 4750 # context length for each segment   <- modify this to change sequence length
+center_len: 500 # interested region for each segment
+
+chr_path:
+  '1': chr1.csv
+  '2': chr2.csv
+  '3': chr3.csv
+  '4': chr4.csv
+  '5': chr5.csv
+  '6': chr6.csv
+  '7': chr7.csv
+  '8': chr8.csv
+  '9': chr9.csv
+  '10': chr10.csv
+  '11': chr11.csv
+  '12': chr12.csv
+  '13': chr13.csv
+  '14': chr14.csv
+  '15': chr15.csv
+  '16': chr16.csv
+  '17': chr17.csv
+  '18': chr18.csv
+  '19': chr19.csv
+  '20': chr20.csv
+  '21': chr21.csv
+  '22': chr22.csv
+  'X': chrX.csv
+  'Y': chrY.csv
+
+class_type: 'detail'
+
+
+tissue_dict:
+  0 : 'Adipose - Subcutaneous'
+  1 : 'Adipose - Visceral (Omentum)'
+  2 : 'Adrenal Gland'
+  3 : 'Artery - Aorta'
+  4 : 'Artery - Coronary'
+  5 : 'Artery - Tibial'
+  6 : 'Bladder'
+  7 : 'Brain - Amygdala'
+  8 : 'Brain - Anterior cingulate cortex (BA24)'
+  9 : 'Brain - Caudate (basal ganglia)'
+  10 : 'Brain - Cerebellar Hemisphere'
+  11 : 'Brain - Cerebellum'
+  12 : 'Brain - Cortex'
+  13 : 'Brain - Frontal Cortex (BA9)'
+  14 : 'Brain - Hippocampus'
+  15 : 'Brain - Hypothalamus'
+  16 : 'Brain - Nucleus accumbens (basal ganglia)'
+  17 : 'Brain - Putamen (basal ganglia)'
+  18 : 'Brain - Spinal cord (cervical c-1)'
+  19 : 'Brain - Substantia nigra'
+  20 : 'Breast - Mammary Tissue'
+  21 : 'Cells - EBV-transformed lymphocytes'
+  22 : 'Cells - Cultured fibroblasts'
+  23 : 'Cervix - Ectocervix'
+  24 : 'Cervix - Endocervix'
+  25 : 'Colon - Sigmoid'
+  26 : 'Colon - Transverse'
+  27 : 'Esophagus - Gastroesophageal Junction'
+  28 : 'Esophagus - Mucosa'
+  29 : 'Esophagus - Muscularis'
+  30 : 'Fallopian Tube'
+  31 : 'Heart - Atrial Appendage'
+  32 : 'Heart - Left Ventricle'
+  33 : 'Kidney - Cortex'
+  34 : 'Liver'
+  35 : 'Lung'
+  36 : 'Minor Salivary Gland'
+  37 : 'Muscle - Skeletal'
+  38 : 'Nerve - Tibial'
+  39 : 'Ovary'
+  40 : 'Pancreas'
+  41 : 'Pituitary'
+  42 : 'Prostate'
+  43 : 'Skin - Not Sun Exposed (Suprapubic)'
+  44 : 'Skin - Sun Exposed (Lower leg)'
+  45 : 'Small Intestine - Terminal Ileum'
+  46 : 'Spleen'
+  47 : 'Stomach'
+  48 : 'Testis'
+  49 : 'Thyroid'
+  50 : 'Uterus'
+  51 : 'Vagina'
+  52 : 'Whole Blood'
+
+tissue_dict_rev:
+  'Adipose - Subcutaneous' : 0
+  'Adipose - Visceral (Omentum)' : 1
+  'Adrenal Gland' : 2
+  'Artery - Aorta' : 3
+  'Artery - Coronary' : 4
+  'Artery - Tibial' : 5
+  'Bladder' : 6
+  'Brain - Amygdala' : 7
+  'Brain - Anterior cingulate cortex (BA24)' : 8
+  'Brain - Caudate (basal ganglia)' : 9
+  'Brain - Cerebellar Hemisphere' : 10
+  'Brain - Cerebellum' : 11
+  'Brain - Cortex' : 12
+  'Brain - Frontal Cortex (BA9)' : 13
+  'Brain - Hippocampus' : 14
+  'Brain - Hypothalamus' : 15
+  'Brain - Nucleus accumbens (basal ganglia)' : 16
+  'Brain - Putamen (basal ganglia)' : 17
+  'Brain - Spinal cord (cervical c-1)' : 18
+  'Brain - Substantia nigra' : 19
+  'Breast - Mammary Tissue' : 20
+  'Cells - EBV-transformed lymphocytes' : 21
+  'Cells - Cultured fibroblasts' : 22
+  'Cervix - Ectocervix' : 23
+  'Cervix - Endocervix' : 24
+  'Colon - Sigmoid' : 25
+  'Colon - Transverse' : 26
+  'Esophagus - Gastroesophageal Junction' : 27
+  'Esophagus - Mucosa' : 28
+  'Esophagus - Muscularis' : 29
+  'Fallopian Tube' : 30
+  'Heart - Atrial Appendage' : 31
+  'Heart - Left Ventricle' : 32
+  'Kidney - Cortex' : 33
+  'Liver' : 34
+  'Lung' : 35
+  'Minor Salivary Gland' : 36
+  'Muscle - Skeletal' : 37
+  'Nerve - Tibial' : 38
+  'Ovary' : 39
+  'Pancreas' : 40
+  'Pituitary' : 41
+  'Prostate' : 42
+  'Skin - Not Sun Exposed (Suprapubic)' : 43
+  'Skin - Sun Exposed (Lower leg)' : 44
+  'Small Intestine - Terminal Ileum' : 45
+  'Spleen' : 46
+  'Stomach' : 47
+  'Testis' : 48
+  'Thyroid' : 49
+  'Uterus' : 50
+  'Vagina' : 51
+  'Whole Blood' : 52

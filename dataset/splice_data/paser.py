@@ -12,7 +12,7 @@ chr_list = ['chr1', 'chr2', 'chr3', 'chr4', 'chr5', 'chr6',
             'chr19', 'chr20', 'chr21', 'chr22', 'chrX', 'chrY']
 
 
-def build_sample_list():
+def build_sample_list(sample_list,output_path):
     sample_df = pd.read_csv(sample_list, delimiter='\t')
     sample_df = sample_df[['SAMPID', 'SMTS', 'SMTSD', 'SMMPPD']]
     sample_df = sample_df[~sample_df['SAMPID'].str.contains('K-562')]
@@ -153,6 +153,6 @@ if __name__ == '__main__':
     print(output_folder)
     os.makedirs(output_folder, exist_ok=True)
 
-    build_sample_list()
+    build_sample_list(sample_list=sample_list,output_path=data_path)
     tissue_list = list(configs['tissue_dict_rev'].keys())
     get_merged_infomation(data_path, output_folder, tissue_list, class_type)

@@ -37,7 +37,7 @@ class SpliceDataset(BaseDataset):
         raise NotImplementedError
 
 
-class SpliceNormalDataset(BaseDataset):
+class SpliceNormalDataset(SpliceDataset):
     def __getitem__(self, idx):
         """
         Output:
@@ -47,6 +47,8 @@ class SpliceNormalDataset(BaseDataset):
         Xk, idx = self.idx_to_key[idx]
         Yk = Xk.replace("X", "Y")
         X = self.h5f[Xk][idx]
+        BASES = 'NACGT'
+        X = ''.join(BASES[int(x)] for x in X)
         Y = torch.from_numpy(self.h5f[Yk][idx]).float()
         idx = torch.max(Y[3:, :], dim=0)[0] < 0.05  # desired
         Y[0, idx] = 1
