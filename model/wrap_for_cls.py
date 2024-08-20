@@ -9,6 +9,18 @@ class DNABERTForSeqCls(nn.Module):
         self.model = model
 
     def forward(self, input_ids):
-        mask = torch.ones_like(input_ids).to(input_ids.device)
-        logits = self.model(input_ids, attention_mask=mask).logits
+        input_ids = input_ids[:, 1:]  # drop the first [CLS] token
+        # mask = torch.ones_like(input_ids).to(input_ids.device)
+        logits = self.model(input_ids).logits
+        return logits
+
+
+class RNAErnieForTokenCls(nn.Module):
+    def __init__(self, model) -> None:
+        super().__init__()
+        self.model = model
+
+    def forward(self, input_ids):
+        input_ids = input_ids[:, :]
+        logits = self.model(input_ids).logits
         return logits

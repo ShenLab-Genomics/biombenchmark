@@ -104,10 +104,10 @@ class RNABertForSeqCls(nn.Module):
 
 
 class RNAMsmForSeqCls(nn.Module):
-    def __init__(self, bert, hidden_size=768):
+    def __init__(self, bert, hidden_size=768, class_num=13):
         super(RNAMsmForSeqCls, self).__init__()
         self.bert = bert
-        self.classifier = nn.Linear(hidden_size, 13)
+        self.classifier = nn.Linear(hidden_size, class_num)
 
     def _load_pretrained_bert(self, path):
         self.load_state_dict(torch.load(
@@ -121,10 +121,10 @@ class RNAMsmForSeqCls(nn.Module):
 
 
 class RNAFmForSeqCls(nn.Module):
-    def __init__(self, bert, hidden_size=640):
+    def __init__(self, bert, hidden_size=640, class_num=13):
         super(RNAFmForSeqCls, self).__init__()
         self.bert = bert
-        self.classifier = nn.Linear(hidden_size, 13)
+        self.classifier = nn.Linear(hidden_size, class_num)
 
     def _load_pretrained_bert(self, path):
         self.load_state_dict(torch.load(path, map_location="cpu"), strict=True)
