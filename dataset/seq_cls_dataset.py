@@ -5,12 +5,11 @@ from Bio import SeqIO
 
 
 class SeqClsDataset(Dataset):
-    def __init__(self, fasta_dir, prefix, tokenizer, seed=0, train=True):
+    def __init__(self, fasta_dir, prefix, seed=0, train=True):
         super(SeqClsDataset, self).__init__()
 
         self.fasta_dir = fasta_dir
         self.prefix = prefix
-        self.tokenizer = tokenizer
 
         file_name = "train.fa" if train else "test.fa"
         fasta = os.path.join(os.path.join(fasta_dir, prefix), file_name)

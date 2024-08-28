@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='')
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNABERT', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNABERT', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'DNABERT2'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -104,10 +104,18 @@ if __name__ == '__main__':
         args.max_seq_len = MAX_SEQ_LEN["RNAErnie"]
         args.replace_T = True
         args.replace_U = False
-        tokenizer = RNAErnieTokenizer.from_pretrained(
-            args.model_path,
-        )
 
         ev = seq_cls_evaluator.RNAErnieEvaluator(
+            args, tokenizer=None)  # load tokenizer from model
+        ev.run(args, dataset_train, dataset_eval)
+
+    if args.method == 'DNABERT2':
+        args.max_seq_len = MAX_SEQ_LEN["DNABERT2"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = seq_cls_evaluator.DNABERT2Evaluator(
             args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_eval)

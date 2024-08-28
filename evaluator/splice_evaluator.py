@@ -3,18 +3,58 @@ import time
 from collections import defaultdict
 import torch
 import numpy as np
-
+from torch import nn
+import torch.nn.functional as F
 from model.BERT_like import RNATokenizer
 from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
-from model.BERT_like import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss
-from model.wrap_for_cls import DNABERTForSeqCls
+from model.BERT_like import SeqClsLoss
+from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
-from sklearn.metrics import average_precision_score,roc_auc_score
+from sklearn.metrics import average_precision_score, roc_auc_score
+
+
+class SpliceTokenClsLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, outputs, labels):
+        pred_dim = outputs.shape[1]
+        res = {}
+        if pred_dim == 3:
+            # neither / acceptor / donor
+            # calculate class 1 and 2
+            outputs = outputs[:, :3]
+            labels = labels[:, :3]
+            loss = F.cross_entropy(outputs, labels)
+
+        elif pred_dim == 18 or pred_dim == 56:
+
+            if pred_dim == 18:
+                # 3 classes and 15 tissues
+                # calculate 15 tissues separately
+                outputs = outputs[:, 3:]
+                labels = labels[:, 3:]
+                pass
+
+            if pred_dim == 56:
+                # 3 classes and 53 tissues
+                # calculate 53 tissues separately
+                outputs = outputs[:, 3:]
+                labels = labels[:, 3:]
+                pass
+
+            assert torch.isnan(labels).sum() == 0, "Labels is NaN."
+            loss = F.binary_cross_entropy_with_logits(outputs, labels)
+            assert torch.isnan(loss).sum() == 0, "Loss is NaN."
+        else:
+            raise ValueError("Invalid prediction dimension.")
+        return loss
+
 
 class SpliceMetrics(BaseMetrics):
     def __call__(self, outputs, labels):
@@ -25,6 +65,8 @@ class SpliceMetrics(BaseMetrics):
         Returns:
             metrics in dict
         """
+        # outputs = outputs.cpu().detach().numpy()
+        # labels = labels.cpu().detach().numpy()
         pred_dim = outputs.shape[-1]
         res = {}
         if pred_dim == 3:
@@ -33,7 +75,7 @@ class SpliceMetrics(BaseMetrics):
             outputs = outputs[:, 1:]
             labels = labels[:, 1:]
 
-        elif pred_dim == 18 or pred_dim == 54:
+        elif pred_dim == 18 or pred_dim == 56:
 
             if pred_dim == 18:
                 # 3 classes and 15 tissues
@@ -42,7 +84,7 @@ class SpliceMetrics(BaseMetrics):
                 labels = labels[:, 3:]
                 pass
 
-            if pred_dim == 54:
+            if pred_dim == 56:
                 # 3 classes and 51 tissues
                 # calculate 51 tissues separately
                 outputs = outputs[:, 3:]
@@ -51,7 +93,7 @@ class SpliceMetrics(BaseMetrics):
 
         else:
             raise ValueError("Invalid prediction dimension.")
-        
+
         for name in self.metrics:
             func = getattr(self, name)
             if func:
@@ -83,10 +125,10 @@ class SpliceMetrics(BaseMetrics):
         idx_pred = argsorted_y_pred[-int(1 * len(idx_true)):]
         if len(idx_true) <= 0:
             raise ValueError("No positive data!")
-        
+
         topkl_accuracy = np.size(np.intersect1d(
             idx_true, idx_pred)) / float(min(len(idx_pred), len(idx_true)))
-        
+
         threshold = sorted_y_pred[-int(1 * len(idx_true))]
 
         return {
@@ -119,7 +161,7 @@ class SpliceTrainer(BaseTrainer):
         time_st = time.time()
         num_total, loss_total = 0, 0
 
-        with tqdm(total=len(self.train_dataset)) as pbar:
+        with tqdm(total=len(self.train_dataset), mininterval=2) as pbar:
             for i, data in enumerate(self.train_dataloader):
                 # for non-language model, the "input_ids" represents the one-hot encoding of the sequence
                 input_ids = data["input_ids"].to(self.args.device)
@@ -152,7 +194,7 @@ class SpliceTrainer(BaseTrainer):
         self.model.eval()
         time_st = time.time()
         num_total = 0
-        with tqdm(total=len(self.eval_dataset)) as pbar:
+        with tqdm(total=len(self.eval_dataset), mininterval=2) as pbar:
             outputs_dataset, labels_dataset = [], []
             for i, data in enumerate(self.eval_dataloader):
                 input_ids = data["input_ids"].to(self.args.device)
@@ -163,6 +205,7 @@ class SpliceTrainer(BaseTrainer):
 
                 outputs_dataset.append(logits)
                 labels_dataset.append(labels)
+                num_total += self.args.batch_size
 
                 if num_total >= self.args.logging_steps:
                     pbar.update(num_total)
@@ -170,12 +213,21 @@ class SpliceTrainer(BaseTrainer):
 
         outputs_dataset = torch.concat(outputs_dataset, axis=0)
         labels_dataset = torch.concat(labels_dataset, axis=0)
-        # save best model
+
+        # Now the shape of output is (total_batch, num_labels, seq_len)
+        # We should reshape it to (total_batch*seq_len, num_labels)
+        outputs_dataset = outputs_dataset.transpose(1, 2)
+        outputs_dataset = outputs_dataset.reshape(-1, outputs_dataset.shape[2])
+        outputs_dataset = outputs_dataset.cpu().detach().numpy()
+        labels_dataset = labels_dataset.transpose(1, 2)
+        labels_dataset = labels_dataset.reshape(-1, labels_dataset.shape[2])
+        labels_dataset = labels_dataset.cpu().detach().numpy()
+
         metrics_dataset = self.compute_metrics(outputs_dataset, labels_dataset)
 
         # log results to screen/bash
         results = {}
-        log = 'Test\t' + self.args.dataset + "\t"
+        log = 'Test\t' + self.args.method + "\t"
         # log results to visualdl
         tag_value = defaultdict(float)
         # extract results
@@ -186,7 +238,17 @@ class SpliceTrainer(BaseTrainer):
             tag_value[tag] = v
 
         time_ed = time.time() - time_st
-        print(log.format(**results), "; Time: {:.4f}s".format(time_ed))
+        print(results, "; Time: {:.4f}s".format(time_ed))
+
+
+def seq2kmer(seq, kmer=1):
+    kmer_text = ""
+    i = 0
+    while i < len(seq):
+        kmer_text += (seq[i: i + 1] + " ")
+        i += 1
+    kmer_text = kmer_text.strip()
+    return kmer_text
 
 
 class SpliceTokenCollator(BaseCollator):
@@ -197,7 +259,7 @@ class SpliceTokenCollator(BaseCollator):
         assert replace_T ^ replace_U, "Only replace T or U."
         self.replace_T = replace_T
         self.replace_U = replace_U
-        self.use_kmer = use_kmer
+        self.use_kmer = int(use_kmer)
         self.overflow = overflow
 
     def __call__(self, raw_data):
@@ -211,14 +273,17 @@ class SpliceTokenCollator(BaseCollator):
                 "T", "U") if self.replace_T else seq.replace("U", "T")
 
             start = (len(seq) - self.max_seq_len)//2
-            if self.use_kmer:
+            if self.use_kmer > 0:
                 seq = seq[start-self.overflow:start +
                           self.max_seq_len+self.overflow]
+                seq = seq2kmer(seq)
             else:
                 seq = seq[start:start+self.max_seq_len]
 
-            input_text = "[CLS] " + seq
+            input_text = "[CLS]" + seq
+            # print(input_text)
             input_ids = self.tokenizer(input_text)["input_ids"]
+            # print(input_ids)
             input_ids_stack.append(input_ids)
 
             label = data[1]
@@ -284,7 +349,7 @@ class SpliceEvaluator:
     def buildTrainer(self, args):
         self._loss_fn = SeqClsLoss().to(self.device)
         self._collate_fn = SpliceOneHotCollator(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U)
+            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
         self._metric = SpliceMetrics(metrics=args.metrics)
 
@@ -301,21 +366,72 @@ class SpliceEvaluator:
             optimizer=self._optimizer,
             compute_metrics=self._metric,
         )
-        for i_epoch in range(args.num_train_epochs):
+        for i_epoch in range(1, args.num_train_epochs + 1):
             print("Epoch: {}".format(i_epoch))
             self.token_cls_trainer.train(i_epoch)
             self.token_cls_trainer.eval(i_epoch)
+            if (i_epoch == 1) or (i_epoch % 5 == 0):
+                self.token_cls_trainer.save_model(
+                    args.output_dir, i_epoch)
 
 
 class SpliceBERTEvaluator(SpliceEvaluator):
-    def __init__(self, args, tokenizer=None, class_num=2):
+    def __init__(self, args, tokenizer=None):
         super().__init__(args, tokenizer)
         # set the path to the folder of pre-trained SpliceBERT
         self.SPLICEBERT_PATH = args.model_path
         # load tokenizer
         self.tokenizer = tokenizer
-        self.class_num = class_num
+        self.class_num = args.class_num
         self.model = AutoModelForTokenClassification.from_pretrained(
             args.model_path, num_labels=args.class_num).to(self.device)
+        self.model = SpliceBERTForTokenCls(self.model)
+
+    def buildTrainer(self, args):
+        self._loss_fn = SpliceTokenClsLoss().to(self.device)
+        self._collate_fn = SpliceTokenCollator(
+            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        self._metric = SpliceMetrics(metrics=args.metrics)
 
     pass
+
+
+class DNABERTEvaluator(SpliceBERTEvaluator):
+    def __init__(self, args, tokenizer=None):
+        super().__init__(args, tokenizer)
+        self.model = AutoModelForTokenClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num).to(self.device)
+        self.model = DNABERTForTokenCls(self.model)
+
+
+class RNAFMEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(args, tokenizer=tokenizer)
+        self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
+        self.model = RNAFmForTokenCls(self.model, num_labels=args.class_num)
+        self.model.to(self.device)
+
+    def buildTrainer(self, args):
+        self._loss_fn = SpliceTokenClsLoss().to(self.device)
+        self._collate_fn = SpliceTokenCollator(
+            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        self._metric = SpliceMetrics(metrics=args.metrics)
+
+
+class RNAErnieEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer=None) -> None:
+        super().__init__(args, tokenizer)
+        self.model = AutoModelForTokenClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num
+        )
+        self.model = RNAErnieForTokenCls(
+            self.model, num_labels=args.class_num).to(self.device)
+
+    def buildTrainer(self, args):
+        self._loss_fn = SpliceTokenClsLoss().to(self.device)
+        self._collate_fn = SpliceTokenCollator(
+            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        self._metric = SpliceMetrics(metrics=args.metrics)

@@ -58,13 +58,19 @@ class Site:
 ###
 
 
-def build_sample_list(sample_list, output_path):
+def build_sample_list(sample_list, output_path, class_type):
     sample_df = pd.read_csv(sample_list, delimiter='\t')
     sample_df = sample_df[['SAMPID', 'SMTS', 'SMTSD', 'SMMPPD']]
     sample_df = sample_df[~sample_df['SAMPID'].str.contains('K-562')]
-    sample_df = sample_df[sample_df['SMTSD'] !=
-                          'Cells - EBV-transformed lymphocytes']
+    if class_type == 'group':
+        sample_df = sample_df[sample_df['SMTS'] !=
+                              'Cells - EBV-transformed lymphocytes']
+    elif class_type == 'detail':
+        pass
+    else:
+        raise ValueError('class_type should be group or detail')
     target_file = os.path.join(output_path, 'sample.csv')
+    print('sample list file:', target_file)
     sample_df.to_csv(target_file, index=None)
     pass
 
@@ -79,13 +85,13 @@ def get_paralog_list(para_db):
     return para_df
 
 
-def filt_tissue_data(df: pd.DataFrame, tissue_type_list, class_type='detail'):
+def filt_tissue_data(df: pd.DataFrame, tissue_type_list, output_folder='', class_type='detail'):
     '''
     class_type = 'detail' | 'group'
         'detail' means using detailed tissue name
         'group' using rough tissue type
     '''
-    sample_file = os.path.join(data_path, 'sample.csv')
+    sample_file = os.path.join(output_folder, 'sample.csv')
     sample_list = pd.read_csv(sample_file)
     all_samples = sample_list['SAMPID'].values
     columns = list(df.columns)
@@ -119,16 +125,16 @@ def cut_description(df):
     return df
 
 
-def get_merged_infomation(data_folder, output_folder, tissue_list, class_type, para_db):
+def get_merged_infomation(source_folder, output_folder, tissue_list, class_type, para_db):
     gene_df = pd.read_csv(gene_db, header=0, sep='\t')
     gene_df = gene_df[['Gene stable ID', 'Gene name',
                        'Strand']].drop_duplicates(keep='first')
     gene_df['Description'] = gene_df['Gene stable ID']
     for chrom in chr_list:
-        fpath = os.path.join(data_folder, chrom+'.csv')
+        fpath = os.path.join(source_folder, chrom+'.csv')
         df = pd.read_csv(fpath, header=0)
         df_data, tag_list = filt_tissue_data(
-            df, tissue_list, class_type=class_type)
+            df, tissue_list, output_folder=output_folder, class_type=class_type)
         df = df[['chr', 'left', 'right', 'Description']]
         df = pd.concat([df, df_data], axis=1)
         df = df.apply(cut_description, axis=1)
@@ -292,7 +298,7 @@ if __name__ == '__main__':
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     ###
-    data_folder = os.path.join(script_dir, configs['tissue_data_folder'])
+    output_folder = os.path.join(script_dir, configs['tissue_data_folder'])
     sample_list = os.path.join(
         script_dir, configs['source_data']['sample_list'])
     gene_db = os.path.join(
@@ -300,25 +306,24 @@ if __name__ == '__main__':
     para_db = os.path.join(script_dir, configs['source_data']['paralog_data'])
     data_path = os.path.join(script_dir, configs['source_data']['data_path'])
     fasta = os.path.join(script_dir, configs['ref_genome'])
+    class_type = configs['class_type']
     ###
 
     # Parse source data if needed
     check_exist = True
     for chrom in CHROM_GROUP:
-        if not os.path.exists(os.path.join(data_folder, chrom+'_after.csv')):
+        if not os.path.exists(os.path.join(output_folder, chrom+'_after.csv')):
             check_exist = False
             break
     if not check_exist:
         # parse source data
         print('Pre-processing required')
-        os.makedirs(data_folder, exist_ok=True)
-        build_sample_list(sample_list, output_path=data_path)
+        os.makedirs(output_folder, exist_ok=True)
+        build_sample_list(
+            sample_list, output_path=output_folder, class_type=class_type)
         tissue_list = list(configs['tissue_dict_rev'].keys())
-        class_type = configs['class_type']
-        data_path = configs['source_data']['data_path']
-        data_path = os.path.join(script_dir, data_path)
         get_merged_infomation(
-            data_path, data_folder, tissue_list, class_type, para_db)
+            data_path, output_folder, tissue_list, class_type, para_db)
     print('Pre-processing finished')
     ##
 
@@ -337,7 +342,7 @@ if __name__ == '__main__':
     tx_df = tx_df.groupby('description').agg({'start': 'min', 'end': 'max'})
     ##
 
-    h5f2 = h5py.File(os.path.join(data_folder,
+    h5f2 = h5py.File(os.path.join(output_folder,
                                   'dataset' + '_' +
                                   args.mode + '.h5'), 'w')
 
@@ -346,8 +351,10 @@ if __name__ == '__main__':
     for chrom in CHROM_GROUP:
         print('process:', chrom)
         # process GTEx csv
-        fpath = os.path.join(data_folder, chrom+'_after.csv')
+        fpath = os.path.join(output_folder, chrom+'_after.csv')
+        print(fpath)
         df = pd.read_csv(fpath, header=0)
+        # assert df.isna().sum().sum() == 0, 'nan in df'
         tag_listL = [tag for tag in df.columns if str(tag)[0:2] == 'uL']
         tag_listR = [tag for tag in df.columns if str(tag)[0:2] == 'uR']
         df_group = df.groupby('description')
@@ -405,6 +412,8 @@ if __name__ == '__main__':
 
             h5f2.create_dataset('X' + str(batch_cnt), data=X_batch)
             h5f2.create_dataset('Y' + str(batch_cnt), data=Y_batch)
+
+            assert np.isnan(Y_batch).sum() == 0, 'nan in Y_batch'
 
             if ('debug' in args.mode) and (batch_cnt > 200):
                 break

@@ -134,6 +134,22 @@ class BaseMetrics(abc.ABC):
         preds = preds[:, 1]
         return roc_auc_score(labels, preds)
 
+    @staticmethod
+    def pr_auc(preds, labels):
+        """
+        All args have same shapes.
+        Args:
+            preds: predictions of model, (batch_size, 1)
+            labels: ground truth, (batch_size, 1)
+
+        Returns:
+            precision
+        """
+        labels += 1
+        preds = preds[:, 1]
+        return roc_auc_score(labels, preds, average='macro')
+
+
 class Stack(object):
 
     def __init__(self, axis=0, dtype=None):
@@ -145,13 +161,15 @@ class Stack(object):
             self._dtype) if self._dtype else np.stack(data, axis=self._axis)
         return data
 
+
 class BaseCollator(object):
     def __init__(self):
         self.stack_fn = Stack()
 
     def __call__(self, raw_data_b):
         raise NotImplementedError("Must implement __call__ method.")
-    
+
+
 class BaseTrainer(object):
     def __init__(self,
                  args,
@@ -200,29 +218,27 @@ class BaseTrainer(object):
         if self.eval_dataset:
             self.eval_dataloader = self._get_dataloader(self.eval_dataset)
 
-    def save_model(self, metrics_dataset, epoch):
+    def save_model(self, output_folder, epoch):
         """
         Save model after epoch training in save_dir.
         Args:
-            metrics_dataset: metrics of dataset
             epoch: training epoch number
 
         Returns:
             None
         """
-        if metrics_dataset[self.name_pbar] > self.max_metric:
-            self.max_metric = metrics_dataset[self.name_pbar]
-            if os.path.exists(self.max_model_dir):
-                print("Remove old max model dir:", self.max_model_dir)
-                shutil.rmtree(self.max_model_dir)
+        # if metrics_dataset[self.name_pbar] > self.max_metric:
+        # self.max_metric = metrics_dataset[self.name_pbar]
 
-            self.max_model_dir = os.path.join(
-                self.args.output, "epoch_" + str(epoch))
-            os.makedirs(self.max_model_dir)
-            save_model_path = os.path.join(
-                self.max_model_dir, "model_state.pdparams")
-            torch.save(self.model.state_dict(), save_model_path)
-            print("Model saved at:", save_model_path)
+        # if os.path.exists(output_folder):
+        #     print("Remove old max model dir:", output_folder)
+        #     shutil.rmtree(output_folder)
+
+        os.makedirs(output_folder)
+        save_model_path = os.path.join(
+            output_folder, f"epoch_{epoch}_model_state.pt")
+        torch.save(self.model.state_dict(), save_model_path)
+        print("Model saved at:", save_model_path)
 
     def train(self, epoch):
         raise NotImplementedError("Must implement train method.")
