@@ -3,14 +3,13 @@ import time
 from collections import defaultdict
 import torch
 import numpy as np
-
-from multimolecule import RnaTokenizer, RnaErnieForSequencePrediction
+from transformers.models.bert.configuration_bert import BertConfig
 from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
 from model.BERT_like import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss
-from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls
+from model.wrap_for_cls import DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
@@ -271,39 +270,6 @@ class RNAMsmEvaluator(SeqClsEvaluator):
             args.model_path)
         self.model.to(self.device)
 
-    def run(self, args, train_data, eval_data):
-        _loss_fn = SeqClsLoss().to(self.device)
-
-        # ========== Create the data collator
-        _collate_fn = SeqClsCollator(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
-            label2id=LABEL2ID['nRC'], replace_T=args.replace_T, replace_U=args.replace_U)
-
-        # ========== Create the learning_rate scheduler (if need) and optimizer
-        optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
-
-        # ========== Create the metrics
-        _metric = SeqClsMetrics(metrics=args.metrics)
-
-        args.device = self.device
-        # ========== Create the trainer
-        seq_cls_trainer = SeqClsTrainer(
-            args=args,
-            model=self.model,
-            train_dataset=train_data,
-            eval_dataset=eval_data,
-            data_collator=_collate_fn,
-            loss_fn=_loss_fn,
-            optimizer=optimizer,
-            compute_metrics=_metric,
-        )
-
-        for i_epoch in range(args.num_train_epochs):
-            print("Epoch: {}".format(i_epoch))
-            seq_cls_trainer.train(i_epoch)
-            seq_cls_trainer.eval(i_epoch)
-        pass
-
 
 class RNAFMEvaluator(SeqClsEvaluator):
     def __init__(self, args, tokenizer) -> None:
@@ -311,39 +277,6 @@ class RNAFMEvaluator(SeqClsEvaluator):
         self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
         self.model = RNAFmForSeqCls(self.model)
         self.model.to(self.device)
-
-    def run(self, args, train_data, eval_data):
-        _loss_fn = SeqClsLoss().to(self.device)
-
-        # ========== Create the data collator
-        _collate_fn = SeqClsCollator(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
-            label2id=LABEL2ID['nRC'], replace_T=args.replace_T, replace_U=args.replace_U)
-
-        # ========== Create the learning_rate scheduler (if need) and optimizer
-        optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
-
-        # ========== Create the metrics
-        _metric = SeqClsMetrics(metrics=args.metrics)
-
-        args.device = self.device
-        # ========== Create the trainer
-        seq_cls_trainer = SeqClsTrainer(
-            args=args,
-            model=self.model,
-            train_dataset=train_data,
-            eval_dataset=eval_data,
-            data_collator=_collate_fn,
-            loss_fn=_loss_fn,
-            optimizer=optimizer,
-            compute_metrics=_metric,
-        )
-
-        for i_epoch in range(args.num_train_epochs):
-            print("Epoch: {}".format(i_epoch))
-            seq_cls_trainer.train(i_epoch)
-            seq_cls_trainer.eval(i_epoch)
-        pass
 
 
 class DNABERTEvaluatorSeqCls(SeqClsEvaluator):
@@ -362,10 +295,10 @@ class SpliceBERTEvaluatorSeqCls(DNABERTEvaluatorSeqCls):
 
 class RNAErnieEvaluator(SeqClsEvaluator):
     def __init__(self, args, tokenizer=None) -> None:
-        tokenizer = RnaTokenizer.from_pretrained('model/pretrained/rnaernie')
+        # tokenizer = AutoTokenizer.from_pretrained('model/pretrained/RNAErnie')
         super().__init__(tokenizer)
-        self.model = RnaErnieForSequencePrediction.from_pretrained(
-            'model/pretrained/rnaernie', num_labels=args.class_num)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            'model/pretrained/RNAErnie', num_labels=args.class_num)
         self.model = RNAErnieForSeqCls(
             self.model).to(self.device)
 
@@ -373,6 +306,8 @@ class RNAErnieEvaluator(SeqClsEvaluator):
 class DNABERT2Evaluator(SeqClsEvaluator):
     def __init__(self, args, tokenizer=None) -> None:
         super().__init__(tokenizer)
+        # config = BertConfig.from_pretrained(args.model_path)
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_path, num_labels=args.class_num
+            args.model_path, num_labels=args.class_num, trust_remote_code=True,
         )
+        self.model = DNABERT2ForSeqCls(self.model).to(self.device)

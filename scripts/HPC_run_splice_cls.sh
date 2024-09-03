@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=Test-biom-splice-1
+#SBATCH --job-name=Test-biom-splice-3cls-part2
 #SBATCH --nodes=1 
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks-per-node=1
@@ -11,4 +11,5 @@
 
 cd /public/home/shenninggroup/yny/code/biombenchmark
 
-bash scripts/run_splice_train_test.sh
+# bash scripts/run_splice_train_test.sh
+bash scripts/run_splice_train_test_3.sh

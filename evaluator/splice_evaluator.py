@@ -11,7 +11,7 @@ from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
 from model.BERT_like import SeqClsLoss
-from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls
+from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls, RNAMsmForTokenCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
@@ -72,7 +72,7 @@ class SpliceMetrics(BaseMetrics):
         if pred_dim == 3:
             # neither / acceptor / donor
             # calculate class 1 and 2
-            outputs = outputs[:, 1:]
+            outputs = torch.softmax(outputs, dim=1)[:, 1:]
             labels = labels[:, 1:]
 
         elif pred_dim == 18 or pred_dim == 56:
@@ -80,14 +80,14 @@ class SpliceMetrics(BaseMetrics):
             if pred_dim == 18:
                 # 3 classes and 15 tissues
                 # calculate 15 tissues separately
-                outputs = outputs[:, 3:]
+                outputs = torch.sigmoid(outputs[:, 3:])
                 labels = labels[:, 3:]
                 pass
 
             if pred_dim == 56:
                 # 3 classes and 51 tissues
                 # calculate 51 tissues separately
-                outputs = outputs[:, 3:]
+                outputs = torch.sigmoid(outputs[:, 3:])
                 labels = labels[:, 3:]
                 pass
 
@@ -100,10 +100,9 @@ class SpliceMetrics(BaseMetrics):
                 for i in range(outputs.shape[1]):
                     m = func(outputs[:, i], labels[:, i])
                     res[name + '_' + str(i)] = m
-                m = func(outputs, labels)
+                # m = func(outputs, labels)
             else:
                 raise NotImplementedError
-            res[name] = m
         return res
 
     def topk(self, preds, labels):
@@ -117,7 +116,7 @@ class SpliceMetrics(BaseMetrics):
         ---
             topkl_accuracy: float, the calculated topkl accuracy
         '''
-        idx_true = np.nonzero(labels >= 0.5)[0]
+        idx_true = np.nonzero(labels >= 0.5)
         argsorted_y_pred = np.argsort(preds)
         sorted_y_pred = preds[argsorted_y_pred]
 
@@ -186,6 +185,9 @@ class SpliceTrainer(BaseTrainer):
                     pbar.update(num_total)
                     num_total, loss_total = 0, 0
 
+                if i > 1000:
+                    break
+
         time_ed = time.time() - time_st
         print('Train\tLoss: {:.6f}; Time: {:.4f}s'.format(
             loss.item(), time_ed))
@@ -218,10 +220,10 @@ class SpliceTrainer(BaseTrainer):
         # We should reshape it to (total_batch*seq_len, num_labels)
         outputs_dataset = outputs_dataset.transpose(1, 2)
         outputs_dataset = outputs_dataset.reshape(-1, outputs_dataset.shape[2])
-        outputs_dataset = outputs_dataset.cpu().detach().numpy()
+        outputs_dataset = outputs_dataset.cpu().detach()
         labels_dataset = labels_dataset.transpose(1, 2)
         labels_dataset = labels_dataset.reshape(-1, labels_dataset.shape[2])
-        labels_dataset = labels_dataset.cpu().detach().numpy()
+        labels_dataset = labels_dataset.cpu().detach()
 
         metrics_dataset = self.compute_metrics(outputs_dataset, labels_dataset)
 
@@ -345,13 +347,24 @@ class SpliceEvaluator:
             self.device = torch.device("cpu")
         self.tokenizer = tokenizer
         self.token_cls_trainer = None
+        self.mode = 'token'
 
     def buildTrainer(self, args):
-        self._loss_fn = SeqClsLoss().to(self.device)
-        self._collate_fn = SpliceOneHotCollator(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
-        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
-        self._metric = SpliceMetrics(metrics=args.metrics)
+        mode = self.mode
+        if mode == 'token':
+            self._loss_fn = SpliceTokenClsLoss().to(self.device)
+            self._collate_fn = SpliceTokenCollator(
+                max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+            self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+            self._metric = SpliceMetrics(metrics=args.metrics)
+        elif mode == 'onehot':
+            self._loss_fn = SeqClsLoss().to(self.device)
+            self._collate_fn = SpliceOneHotCollator(
+                max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+            self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+            self._metric = SpliceMetrics(metrics=args.metrics)
+        else:
+            raise ValueError("Invalid mode.")
 
     def run(self, args, train_data, eval_data):
         self.buildTrainer(args)
@@ -366,11 +379,11 @@ class SpliceEvaluator:
             optimizer=self._optimizer,
             compute_metrics=self._metric,
         )
-        for i_epoch in range(1, args.num_train_epochs + 1):
+        for i_epoch in range(args.num_train_epochs):
             print("Epoch: {}".format(i_epoch))
             self.token_cls_trainer.train(i_epoch)
             self.token_cls_trainer.eval(i_epoch)
-            if (i_epoch == 1) or (i_epoch % 5 == 0):
+            if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
                 self.token_cls_trainer.save_model(
                     args.output_dir, i_epoch)
 
@@ -386,13 +399,7 @@ class SpliceBERTEvaluator(SpliceEvaluator):
         self.model = AutoModelForTokenClassification.from_pretrained(
             args.model_path, num_labels=args.class_num).to(self.device)
         self.model = SpliceBERTForTokenCls(self.model)
-
-    def buildTrainer(self, args):
-        self._loss_fn = SpliceTokenClsLoss().to(self.device)
-        self._collate_fn = SpliceTokenCollator(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
-        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
-        self._metric = SpliceMetrics(metrics=args.metrics)
+        self.mode = 'token'
 
     pass
 
@@ -411,13 +418,19 @@ class RNAFMEvaluator(SpliceEvaluator):
         self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
         self.model = RNAFmForTokenCls(self.model, num_labels=args.class_num)
         self.model.to(self.device)
+        self.mode = 'token'
 
-    def buildTrainer(self, args):
-        self._loss_fn = SpliceTokenClsLoss().to(self.device)
-        self._collate_fn = SpliceTokenCollator(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
-        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
-        self._metric = SpliceMetrics(metrics=args.metrics)
+
+class RNAMSMEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer=None) -> None:
+        super().__init__(args, tokenizer)
+        model_config = get_config(args.model_config)
+        self.model = MSATransformer(**model_config)
+        self.model = RNAMsmForTokenCls(self.model, num_labels=args.class_num)
+        self.model._load_pretrained_bert(
+            args.model_path)
+        self.model.to(self.device)
+        self.mode = 'token'
 
 
 class RNAErnieEvaluator(SpliceEvaluator):
@@ -428,10 +441,4 @@ class RNAErnieEvaluator(SpliceEvaluator):
         )
         self.model = RNAErnieForTokenCls(
             self.model, num_labels=args.class_num).to(self.device)
-
-    def buildTrainer(self, args):
-        self._loss_fn = SpliceTokenClsLoss().to(self.device)
-        self._collate_fn = SpliceTokenCollator(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
-        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
-        self._metric = SpliceMetrics(metrics=args.metrics)
+        self.mode = 'token'
