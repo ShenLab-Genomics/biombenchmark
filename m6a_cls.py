@@ -9,6 +9,7 @@ MAX_SEQ_LEN = {"RNABERT": 440,
                "RNAMSM": 512,
                "RNAFM": 512,
                'DNABERT': 512,
+               'DNABERT2': 512,
                "SpliceBERT": 512,
                "RNAErnie": 512,
                "DeepM6A": 101
@@ -31,7 +32,7 @@ if __name__ == '__main__':
         description='')
 
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'SpliceAI', 'SpTransformer', 'DeepM6A', 'RNABERT'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'DeepM6A', 'RNABERT'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -45,9 +46,14 @@ if __name__ == '__main__':
     parser.add_argument("--dataset_train", type=str)
     parser.add_argument("--dataset_test", type=str)
     parser.add_argument('--metrics', type=str2list,
-                        default="F1s,Precision,Recall,Accuracy,Mcc,pr_auc",)
+                        default="F1s,Precision,Recall,Accuracy,Mcc,pr_auc,auc",)
 
     args = parser.parse_args()
+
+    # Special case
+    if '101bp' in args.dataset_train:
+        MAX_SEQ_LEN[args.method] = 101
+    ##
 
     dataset_train = m6a_dataset.M6ADataset(
         fasta_dir=args.dataset_train)
@@ -62,6 +68,17 @@ if __name__ == '__main__':
             args.model_path)
 
         ev = m6a_evaluator.DNABERTEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'DNABERT2':
+        args.max_seq_len = MAX_SEQ_LEN["DNABERT2"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = m6a_evaluator.DNABERT2Evaluator(
+            args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'RNAFM':
@@ -81,11 +98,32 @@ if __name__ == '__main__':
         ev = m6a_evaluator.DeepM6ASeqEvaluator(args, tokenizer=None)
         ev.run(args, dataset_train, dataset_test)
 
-    if args.method == 'RNABERT':
+    if args.method == 'RNABERT' or args.method == 'RNABERT_RAW':
         args.max_seq_len = MAX_SEQ_LEN["RNABERT"]
         args.replace_T = True
         args.replace_U = False
         tokenizer = RNATokenizer(args.vocab_path)
 
         ev = m6a_evaluator.RNABertEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'RNAMSM':
+        args.max_seq_len = MAX_SEQ_LEN["RNAMSM"]
+        args.replace_T = True
+        args.replace_U = False
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = m6a_evaluator.RNAMsmEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'RNAErnie':
+        args.max_seq_len = MAX_SEQ_LEN["RNAErnie"]
+        args.replace_T = True
+        args.replace_U = False
+
+        tokenizer = RNAErnieTokenizer.from_pretrained(
+            args.model_path,
+        )
+        ev = m6a_evaluator.RNAErnieEvaluator(
+            args, tokenizer=tokenizer)  # load tokenizer from model
         ev.run(args, dataset_train, dataset_test)

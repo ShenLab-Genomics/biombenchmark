@@ -9,6 +9,7 @@ MAX_SEQ_LEN = {"RNABERT": 440,
                "RNAMSM": 512,
                "RNAFM": 512,
                'DNABERT': 512,
+               'DNABERT2': 512,
                "SpliceBERT": 512,
                "RNAErnie": 512
                }
@@ -105,8 +106,9 @@ if __name__ == '__main__':
         args.replace_T = True
         args.replace_U = False
 
+        tokenizer = RNATokenizer(args.vocab_path)
         ev = seq_cls_evaluator.RNAErnieEvaluator(
-            args, tokenizer=None)  # load tokenizer from model
+            args, tokenizer=tokenizer)  # load tokenizer from model
         ev.run(args, dataset_train, dataset_eval)
 
     if args.method == 'DNABERT2':

@@ -232,7 +232,7 @@ class RNAMsmEvaluator(M6APredEvaluator):
         super().__init__(tokenizer=tokenizer)
         model_config = get_config(args.model_config)
         self.model = MSATransformer(**model_config)
-        self.model = RNAMsmForSeqCls(self.model)
+        self.model = RNAMsmForSeqCls(self.model,class_num=2)
         self.model._load_pretrained_bert(
             args.model_path)
         self.model.to(self.device)

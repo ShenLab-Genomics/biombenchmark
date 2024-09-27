@@ -88,10 +88,10 @@ class RNATokenizer(PreTrainedTokenizer):
 
 
 class RNABertForSeqCls(nn.Module):
-    def __init__(self, bert, hidden_size=120):
+    def __init__(self, bert, hidden_size=120, class_num=13):
         super(RNABertForSeqCls, self).__init__()
         self.bert = bert
-        self.classifier = nn.Linear(hidden_size, 13)
+        self.classifier = nn.Linear(hidden_size, class_num)
 
     def _load_pretrained_bert(self, path):
         self.load_state_dict(torch.load(

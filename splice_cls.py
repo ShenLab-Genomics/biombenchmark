@@ -6,10 +6,12 @@ from model.BERT_like import RNATokenizer
 from model.RNAErnie.tokenization_rnaernie import RNAErnieTokenizer
 
 MAX_SEQ_LEN = {"RNAMSM": 512,
-               "RNAFM": 510,
+               "RNAFM": 512,
                'DNABERT': 512,
                "SpliceBERT": 510,
-               "RNAErnie": 1000,
+               'RNAMSM': 512,
+               "RNAErnie": 510,
+               "SpTransformer": 9000
                }
 
 
@@ -83,6 +85,20 @@ if __name__ == '__main__':
         ev = splice_evaluator.RNAFMEvaluator(args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
 
+    if args.method == 'RNAMSM':
+        args.max_seq_len = MAX_SEQ_LEN["RNAMSM"]
+        args.replace_T = True
+        args.replace_U = False
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        dataset_train = splice_dataset.SpliceNormalDataset(
+            h5_filename=args.dataset_train)
+        dataset_test = splice_dataset.SpliceNormalDataset(
+            h5_filename=args.dataset_test)
+
+        ev = splice_evaluator.RNAMSMEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
     if args.method == 'RNAErnie':
         args.max_seq_len = MAX_SEQ_LEN["RNAErnie"]
         args.replace_T = True
@@ -99,4 +115,16 @@ if __name__ == '__main__':
             h5_filename=args.dataset_test)
 
         ev = splice_evaluator.RNAErnieEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'SpTransformer':
+        args.max_seq_len = MAX_SEQ_LEN["SpTransformer"]
+        args.replace_T = False
+        args.replace_U = True
+        dataset_train = splice_dataset.SpliceNormalDataset(
+            h5_filename=args.dataset_train)
+        dataset_test = splice_dataset.SpliceNormalDataset(
+            h5_filename=args.dataset_test)
+
+        ev = splice_evaluator.SpTransformerEvaluator(args)
         ev.run(args, dataset_train, dataset_test)
