@@ -5,16 +5,16 @@ from dataset import mrl_dataset
 from model.BERT_like import RNATokenizer
 from model.RNAErnie.tokenization_rnaernie import RNAErnieTokenizer
 
-MAX_SEQ_LEN = {"RNABERT": 100,
-               "RNAMSM": 100,
-               "RNAFM": 100,
-               'DNABERT': 100,
-               'DNABERT2': 100,
-               "SpliceBERT": 100,
-               "RNAErnie": 100,
-               "DeepM6A": 100,
-               "UTRLM": 100,
-               "PureResNet": 100
+MAX_SEQ_LEN = {"RNABERT": 101,
+               "RNAMSM": 101,
+               "RNAFM": 101,
+               'DNABERT': 101,
+               'DNABERT2': 101,
+               "SpliceBERT": 101,
+               "RNAErnie": 101,
+               "DeepM6A": 101,
+               "UTRLM": 101,
+               "PureResNet": 101
                }
 
 

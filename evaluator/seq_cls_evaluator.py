@@ -76,6 +76,7 @@ class SeqClsCollator(BaseCollator):
         label_b = []
         for raw_data in raw_data_b:
             seq = raw_data["seq"]
+            print(seq)
             seq = seq.upper()
             seq = seq.replace(
                 "T", "U") if self.replace_T else seq.replace("U", "T")

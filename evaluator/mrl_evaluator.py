@@ -12,12 +12,10 @@ from collections import defaultdict
 from evaluator.base_evaluator import BaseMetrics
 from evaluator.seq_cls_evaluator import SeqClsTrainer, SeqClsCollator, SeqClsEvaluator, seq2kmer
 import model.RNAFM.fm as fm
-from model.BERT_like import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls
 from model.wrap_for_cls import DNABERTForSeqCls
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel
 from torch.optim import AdamW
-from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForM6ACls, DNABERT2ForSeqCls
-from model.wrap_for_mrl import RNAFmForReg, PureReg, UTRLMForReg
+from model.wrap_for_mrl import RNAFmForReg, PureReg, UTRLMForReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg
 from model.UTRlm import utrlm
 import scipy.stats as stats
 from sklearn import preprocessing
@@ -33,8 +31,8 @@ class MRLMetrics(BaseMetrics):
             metrics in dict
         """
         # regression model
-        logits = outputs.cpu().numpy().astype('float')
-        labels = labels.cpu().numpy().astype('float')
+        logits = outputs.cpu().numpy().reshape(-1).astype('float')
+        labels = labels.cpu().numpy().reshape(-1).astype('float')
 
         res = {}
         for name in self.metrics:
@@ -200,6 +198,7 @@ class MRLEvaluator():
 
     def buildTrainer(self, args):
         self._loss_fn = MRLLoss().to(self.device)
+        # self._loss_fn = torch.nn.MSELoss().to(self.device)
         self._collate_fn = MRLCollator(
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
@@ -233,19 +232,9 @@ class RNAFMEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
         self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
-        # self.model = RNAFmForReg(self.model)
         self.model = RNAFmForReg(self.model)
-        # self.model = PureReg()
+        self.model.apply(weights_init)
         self.model.to(self.device)
-
-
-class DNABERTEvaluator(MRLEvaluator):
-    def __init__(self, args, tokenizer) -> None:
-        super().__init__(tokenizer=tokenizer)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_path, num_labels=1).to(self.device)
-
-        self.model = DNABERTForSeqCls(self.model)
 
 
 class RNAMsmEvaluator(MRLEvaluator):
@@ -253,7 +242,7 @@ class RNAMsmEvaluator(MRLEvaluator):
         super().__init__(tokenizer=tokenizer)
         model_config = get_config(args.model_config)
         self.model = MSATransformer(**model_config)
-        self.model = RNAMsmForSeqCls(self.model, class_num=1)
+        self.model = RNAMsmForReg(self.model, class_num=1)
         self.model._load_pretrained_bert(
             args.model_path)
         self.model.to(self.device)
@@ -265,9 +254,41 @@ class RNABertEvaluator(MRLEvaluator):
         # ========== Build tokenizer, model, criterion
         model_config = get_config(args.model_config)
         self.model = BertModel(model_config)
-        self.model = RNABertForM6ACls(self.model, class_num=1)
+        self.model = RNABERTForReg(self.model, class_num=1)
+        self.model.to(self.device)
+
+
+class DNABERTEvaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_path, num_labels=1).to(self.device)
+        self.model = DNABERTForReg(self.model)
+
+
+class DNABERT2Evaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        self.model = AutoModel.from_pretrained(
+            args.model_path).to(self.device)
+        self.model = DNABERT2ForReg(self.model)
+
+
+class RNABertEvaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        # ========== Build tokenizer, model, criterion
+        model_config = get_config(args.model_config)
+        self.model = BertModel(model_config)
+        self.model = RNABERTForReg(self.model, class_num=1)
         self.model._load_pretrained_bert(args.model_path)
         self.model.to(self.device)
+
+
+class ResNetEvaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        self.model = PureReg()
 
 
 class UTRLMEvaluator(MRLEvaluator):

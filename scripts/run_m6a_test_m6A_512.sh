@@ -84,7 +84,6 @@ python m6a_cls.py --method DNABERT2 \
     --num_train_epochs 10 \
     --batch_size 32 \
     --class_num 2 \
-    --batch_size 64 \
     --logging_steps 50 \
     --use_kmer 0
 

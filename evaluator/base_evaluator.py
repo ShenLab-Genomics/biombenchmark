@@ -209,6 +209,7 @@ class BaseTrainer(object):
             batch_size=self.args.batch_size,
             collate_fn=self.data_collator,
             num_workers=self.args.num_workers,
+            shuffle=True
         )
 
     def _prepare_dataloaders(self):
@@ -234,7 +235,7 @@ class BaseTrainer(object):
         #     print("Remove old max model dir:", output_folder)
         #     shutil.rmtree(output_folder)
 
-        os.makedirs(output_folder,exist_ok=True)
+        os.makedirs(output_folder, exist_ok=True)
         save_model_path = os.path.join(
             output_folder, f"epoch_{epoch}_model_state.pt")
         torch.save(self.model.state_dict(), save_model_path)

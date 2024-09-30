@@ -47,22 +47,24 @@ python m6a_cls.py --method RNABERT --vocab_path 'model/RNABERT/vocab.txt' \
     --model_config 'model/RNABERT/RNABERT.json' \
     --dataset_train 'dataset/m6a_data/101bp/miCLIP/train.fa' \
     --dataset_test 'dataset/m6a_data/101bp/m6A/test.fa' \
+    --class_num 2 \
     --batch_size 64 \
     --num_train_epochs 10 \
     --logging_steps 20 \
     --lr 1e-4 \
     --use_kmer 1
 
-echo "RNABERT_RAW"
-python m6a_cls.py --method RNABERT_RAW --vocab_path 'model/RNABERT/vocab.txt' \
-    --model_config 'model/RNABERT/RNABERT.json' \
-    --dataset_train 'dataset/m6a_data/101bp/miCLIP/train.fa' \
-    --dataset_test 'dataset/m6a_data/101bp/m6A/test.fa' \
-    --batch_size 64 \
-    --num_train_epochs 10 \
-    --logging_steps 20 \
-    --lr 1e-4 \
-    --use_kmer 1
+# echo "RNABERT_RAW"
+# python m6a_cls.py --method RNABERT_RAW --vocab_path 'model/RNABERT/vocab.txt' \
+#     --model_config 'model/RNABERT/RNABERT.json' \
+#     --dataset_train 'dataset/m6a_data/101bp/miCLIP/train.fa' \
+#     --dataset_test 'dataset/m6a_data/101bp/m6A/test.fa' \
+#     --class_num 2 \
+#     --batch_size 64 \
+#     --num_train_epochs 10 \
+#     --logging_steps 20 \
+#     --lr 1e-4 \
+#     --use_kmer 1
 
 ## DNABERT
 echo "DNABERT"
@@ -71,6 +73,7 @@ python m6a_cls.py --method DNABERT \
     --dataset_train 'dataset/m6a_data/101bp/miCLIP/train.fa' \
     --dataset_test 'dataset/m6a_data/101bp/m6A/test.fa' \
     --batch_size 32 \
+    --class_num 2 \
     --num_train_epochs 10 \
     --logging_steps 20 \
     --use_kmer 3
@@ -84,7 +87,6 @@ python m6a_cls.py --method DNABERT2 \
     --num_train_epochs 10 \
     --batch_size 32 \
     --class_num 2 \
-    --batch_size 64 \
     --logging_steps 50 \
     --use_kmer 0
 
@@ -95,6 +97,7 @@ python m6a_cls.py --method SpliceBERT \
     --dataset_train 'dataset/m6a_data/101bp/miCLIP/train.fa' \
     --dataset_test 'dataset/m6a_data/101bp/m6A/test.fa' \
     --batch_size 32 \
+    --class_num 2 \
     --num_train_epochs 10 \
     --logging_steps 50 \
     --lr 1e-4 

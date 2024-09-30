@@ -1,18 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=Test-biom-m6-101
+#SBATCH --job-name=Test-biom-mrl
 #SBATCH --nodes=1 
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --output=/public/home/shenninggroup/yny/code/biombenchmark/logs/%j.out
 #SBATCH --error=/public/home/shenninggroup/yny/code/biombenchmark/logs/%j.err
 #SBATCH --partition=gpu
-#SBATCH -w, --nodelist=gpu01
+#SBATCH -w, --nodelist=gpu02
 #SBATCH --gres=gpu:1
 
 cd /public/home/shenninggroup/yny/code/biombenchmark
 
-# bash scripts/run_m6a_test.sh
-# echo "m6A-101bp-miclip"
-bash scripts/run_m6a_test_m6A_101.sh
-
-# bash run_m6a_append_DNABERT2.sh
+echo "mrl"
+bash scripts/run_mrl_test.sh
