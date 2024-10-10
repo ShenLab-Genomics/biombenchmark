@@ -14,7 +14,8 @@ MAX_SEQ_LEN = {"RNABERT": 101,
                "RNAErnie": 101,
                "DeepM6A": 101,
                "UTRLM": 101,
-               "PureResNet": 101
+               "PureResNet": 101,
+               'Optimus': 101
                }
 
 
@@ -34,7 +35,7 @@ if __name__ == '__main__':
         description='')
 
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'RNABERT', 'UTRLM', 'PureResNet'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'RNABERT', 'UTRLM', 'PureResNet', 'Optimus'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -73,15 +74,6 @@ if __name__ == '__main__':
         ev = mrl_evaluator.ResNetEvaluator(args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
 
-    if args.method == 'RNABERT':
-        args.max_seq_len = MAX_SEQ_LEN["RNABERT"]
-        args.replace_T = True
-        args.replace_U = False
-        tokenizer = RNATokenizer(args.vocab_path)
-
-        ev = mrl_evaluator.RNABertEvaluator(args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_test)
-
     if args.method == 'RNAMSM':
         args.max_seq_len = MAX_SEQ_LEN["RNAMSM"]
         args.replace_T = True
@@ -91,13 +83,52 @@ if __name__ == '__main__':
         ev = mrl_evaluator.RNAMsmEvaluator(args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
 
+    if args.method == 'RNABERT':
+        args.max_seq_len = MAX_SEQ_LEN["RNABERT"]
+        args.replace_T = True
+        args.replace_U = False
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = mrl_evaluator.RNABertEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if (args.method == 'SpliceBERT') or (args.method == 'DNABERT'):
+        args.max_seq_len = MAX_SEQ_LEN[args.method]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = mrl_evaluator.DNABERTEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'DNABERT2':
+        args.max_seq_len = MAX_SEQ_LEN["DNABERT2"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = mrl_evaluator.DNABERT2Evaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
     if args.method == 'UTRLM':
         args.max_seq_len = MAX_SEQ_LEN["UTRLM"]
         args.replace_T = False
         args.replace_U = True
         tokenizer = RNATokenizer(args.vocab_path)
 
-        # ev = mrl_evaluator.UTRLMEvaluator(args, tokenizer=None)
+        ev = mrl_evaluator.UTRLMEvaluator(args, tokenizer=None)
+        ev.run(args, dataset_train, dataset_test)
+        # ev = mrl_evaluator.UTRLMoriginalEvaluator(args, tokenizer=tokenizer)
         # ev.run(args, dataset_train, dataset_test)
-        ev = mrl_evaluator.UTRLMoriginalEvaluator(args, tokenizer=tokenizer)
+
+    if args.method == 'Optimus':
+        args.max_seq_len = MAX_SEQ_LEN["Optimus"]
+        args.replace_T = True
+        args.replace_U = False
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = mrl_evaluator.OptimusEvaluator(args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)

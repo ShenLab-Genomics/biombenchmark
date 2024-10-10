@@ -59,7 +59,7 @@ class SpliceTokenClsLoss(nn.Module):
 
 
 class SpliceMetrics(BaseMetrics):
-    def __call__(self, outputs, labels):
+    def __call__(self, outputs, labels, epoch=0):
         """
         Args:
             outputs: logits in tensor

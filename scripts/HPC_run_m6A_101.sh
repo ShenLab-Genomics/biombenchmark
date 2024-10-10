@@ -3,8 +3,8 @@
 #SBATCH --nodes=1 
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks-per-node=1
-#SBATCH --output=/public/home/shenninggroup/yny/code/biombenchmark/logs/%j.out
-#SBATCH --error=/public/home/shenninggroup/yny/code/biombenchmark/logs/%j.err
+#SBATCH --output=/public/home/shenninggroup/yny/code/biombenchmark/logs/%j_m6a101.out
+#SBATCH --error=/public/home/shenninggroup/yny/code/biombenchmark/logs/%j_m6a101.err
 #SBATCH --partition=gpu
 #SBATCH -w, --nodelist=gpu01
 #SBATCH --gres=gpu:1

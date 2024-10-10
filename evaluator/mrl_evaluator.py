@@ -15,14 +15,15 @@ import model.RNAFM.fm as fm
 from model.wrap_for_cls import DNABERTForSeqCls
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel
 from torch.optim import AdamW
-from model.wrap_for_mrl import RNAFmForReg, PureReg, UTRLMForReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg
+from model.wrap_for_mrl import RNAFmForReg, PureReg, UTRLMForReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus
 from model.UTRlm import utrlm
 import scipy.stats as stats
 from sklearn import preprocessing
+from transformers.models.bert.configuration_bert import BertConfig
 
 
 class MRLMetrics(BaseMetrics):
-    def __call__(self, outputs, labels):
+    def __call__(self, outputs, labels, epoch=0):
         """
         Args:
             outputs: logits in tensor
@@ -255,23 +256,25 @@ class RNABertEvaluator(MRLEvaluator):
         model_config = get_config(args.model_config)
         self.model = BertModel(model_config)
         self.model = RNABERTForReg(self.model, class_num=1)
+        self.model._load_pretrained_bert(args.model_path)
         self.model.to(self.device)
 
 
 class DNABERTEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_path, num_labels=1).to(self.device)
-        self.model = DNABERTForReg(self.model)
+        self.model = AutoModel.from_pretrained(
+            args.model_path)
+        self.model = DNABERTForReg(self.model, args).to(self.device)
 
 
 class DNABERT2Evaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
+        config = BertConfig.from_pretrained(args.model_path)
         self.model = AutoModel.from_pretrained(
-            args.model_path).to(self.device)
-        self.model = DNABERT2ForReg(self.model)
+            args.model_path, trust_remote_code=True,config=config)
+        self.model = DNABERT2ForReg(self.model).to(self.device)
 
 
 class RNABertEvaluator(MRLEvaluator):
@@ -280,7 +283,7 @@ class RNABertEvaluator(MRLEvaluator):
         # ========== Build tokenizer, model, criterion
         model_config = get_config(args.model_config)
         self.model = BertModel(model_config)
-        self.model = RNABERTForReg(self.model, class_num=1)
+        self.model = RNABERTForReg(self.model)
         self.model._load_pretrained_bert(args.model_path)
         self.model.to(self.device)
 
@@ -288,18 +291,18 @@ class RNABertEvaluator(MRLEvaluator):
 class ResNetEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
-        self.model = PureReg()
+        self.model = PureReg().to(self.device)
 
 
 class UTRLMEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
-        from multimolecule import RnaTokenizer, UtrLmForSequencePrediction
+        from multimolecule import RnaTokenizer, UtrLmForSequencePrediction, UtrLmModel
         tokenizer = RnaTokenizer.from_pretrained('model/UTRLM')
         super().__init__(tokenizer=tokenizer)
-        model = UtrLmForSequencePrediction.from_pretrained(
-            'model/UTRLM').to(self.device)
+        model = UtrLmModel.from_pretrained(
+            'model/UTRLM')
 
-        self.model = UTRLMForReg(model)
+        self.model = UTRLMForReg(model).to(self.device)
         # self.model = AutoModelForSequenceClassification.from_pretrained(
         #     args.model_path, num_labels=1).to(self.device)
         # self.model = DNABERT2ForSeqCls(self.model)
@@ -308,7 +311,7 @@ class UTRLMEvaluator(MRLEvaluator):
 class UTRLMoriginalEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
-        modelfile = '/public/home/shenninggroup/yny/code/biombenchmark/model/UTRlm/model.pt'
+        modelfile = args.model_path
 
         model = utrlm.CNN_linear()
         # st.write(model.state_dict().keys())
@@ -317,19 +320,25 @@ class UTRLMoriginalEvaluator(MRLEvaluator):
             modelfile, map_location=torch.device('cpu')).items()}, strict=True)
         self.model = model.to(self.device)
 
-    def run(self, args, train_data, eval_data):
-        self.buildTrainer(args)
-        args.device = self.device
-        self.seq_cls_trainer = MRLTrainer(
-            args=args,
-            model=self.model,
-            train_dataset=train_data,
-            eval_dataset=eval_data,
-            data_collator=self._collate_fn,
-            loss_fn=self._loss_fn,
-            optimizer=self._optimizer,
-            compute_metrics=self._metric,
-        )
-        for i_epoch in range(args.num_train_epochs):
-            print("Epoch: {}".format(i_epoch))
-            self.seq_cls_trainer.eval(i_epoch)
+    # def run(self, args, train_data, eval_data):
+    #     self.buildTrainer(args)
+    #     args.device = self.device
+    #     self.seq_cls_trainer = MRLTrainer(
+    #         args=args,
+    #         model=self.model,
+    #         train_dataset=train_data,
+    #         eval_dataset=eval_data,
+    #         data_collator=self._collate_fn,
+    #         loss_fn=self._loss_fn,
+    #         optimizer=self._optimizer,
+    #         compute_metrics=self._metric,
+    #     )
+    #     for i_epoch in range(args.num_train_epochs):
+    #         print("Epoch: {}".format(i_epoch))
+    #         self.seq_cls_trainer.eval(i_epoch)
+
+
+class OptimusEvaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer=None):
+        super().__init__(tokenizer=tokenizer)
+        self.model = Optimus(inp_len=104).to(self.device)

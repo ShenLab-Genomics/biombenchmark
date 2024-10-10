@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr", default=1e-4, type=float)
     parser.add_argument("--class_num", default=3, type=int)
     parser.add_argument("--model_path", default=False)
+    parser.add_argument("--output_dir", default=False)
     parser.add_argument("--model_config", default=False)
     parser.add_argument("--vocab_path", default='model/RNABERT/vocab.txt')
     parser.add_argument("--use_kmer", default=0, type=int)
@@ -50,6 +51,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    assert args.output_dir, "output_dir is required."
+
     # Special case
     if '101bp' in args.dataset_train:
         MAX_SEQ_LEN[args.method] = 101
@@ -59,6 +62,33 @@ if __name__ == '__main__':
         fasta_dir=args.dataset_train)
     dataset_test = m6a_dataset.M6ADataset(
         fasta_dir=args.dataset_test)
+
+    if args.method == 'RNAFM':
+        args.replace_T = True
+        args.replace_U = False
+        args.max_seq_len = MAX_SEQ_LEN[args.method]
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = m6a_evaluator.RNAFMEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'RNAMSM':
+        args.max_seq_len = MAX_SEQ_LEN["RNAMSM"]
+        args.replace_T = True
+        args.replace_U = False
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = m6a_evaluator.RNAMsmEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'RNABERT' or args.method == 'RNABERT_RAW':
+        args.max_seq_len = MAX_SEQ_LEN["RNABERT"]
+        args.replace_T = True
+        args.replace_U = False
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = m6a_evaluator.RNABertEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
 
     if (args.method == 'SpliceBERT') or (args.method == 'DNABERT'):
         args.max_seq_len = MAX_SEQ_LEN[args.method]
@@ -81,41 +111,6 @@ if __name__ == '__main__':
             args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
 
-    if args.method == 'RNAFM':
-        args.replace_T = True
-        args.replace_U = False
-        args.max_seq_len = MAX_SEQ_LEN[args.method]
-        tokenizer = RNATokenizer(args.vocab_path)
-
-        ev = m6a_evaluator.RNAFMEvaluator(args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_test)
-
-    if args.method == 'DeepM6A':
-        args.replace_T = False
-        args.replace_U = True
-        args.max_seq_len = MAX_SEQ_LEN[args.method]
-
-        ev = m6a_evaluator.DeepM6ASeqEvaluator(args, tokenizer=None)
-        ev.run(args, dataset_train, dataset_test)
-
-    if args.method == 'RNABERT' or args.method == 'RNABERT_RAW':
-        args.max_seq_len = MAX_SEQ_LEN["RNABERT"]
-        args.replace_T = True
-        args.replace_U = False
-        tokenizer = RNATokenizer(args.vocab_path)
-
-        ev = m6a_evaluator.RNABertEvaluator(args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_test)
-
-    if args.method == 'RNAMSM':
-        args.max_seq_len = MAX_SEQ_LEN["RNAMSM"]
-        args.replace_T = True
-        args.replace_U = False
-        tokenizer = RNATokenizer(args.vocab_path)
-
-        ev = m6a_evaluator.RNAMsmEvaluator(args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_test)
-
     if args.method == 'RNAErnie':
         args.max_seq_len = MAX_SEQ_LEN["RNAErnie"]
         args.replace_T = True
@@ -126,4 +121,12 @@ if __name__ == '__main__':
         )
         ev = m6a_evaluator.RNAErnieEvaluator(
             args, tokenizer=tokenizer)  # load tokenizer from model
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'DeepM6A':
+        args.replace_T = False
+        args.replace_U = True
+        args.max_seq_len = MAX_SEQ_LEN[args.method]
+
+        ev = m6a_evaluator.DeepM6ASeqEvaluator(args, tokenizer=None)
         ev.run(args, dataset_train, dataset_test)
