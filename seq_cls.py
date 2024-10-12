@@ -38,6 +38,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr", default=1e-4, type=float)
     parser.add_argument("--class_num", default=13, type=int)
     parser.add_argument("--model_path", default=False)
+    parser.add_argument("--output_dir", default=False)
     parser.add_argument("--model_config", default=False)
     parser.add_argument("--vocab_path", default='model/RNABERT/vocab.txt')
     parser.add_argument("--use_kmer", default=1, type=int)
@@ -49,7 +50,7 @@ if __name__ == '__main__':
 
     dataset_train = seq_cls_dataset.SeqClsDataset(
         fasta_dir=args.dataset, prefix='nRC')
-    dataset_eval = seq_cls_dataset.SeqClsDataset(
+    dataset_test = seq_cls_dataset.SeqClsDataset(
         fasta_dir=args.dataset, prefix='nRC', train=False)
 
     if args.method == 'RNABERT':
@@ -59,7 +60,7 @@ if __name__ == '__main__':
         tokenizer = RNATokenizer(args.vocab_path)
 
         ev = seq_cls_evaluator.RNABertEvaluator(args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_eval)
+        ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'RNAFM':
         args.max_seq_len = MAX_SEQ_LEN["RNAFM"]
@@ -68,7 +69,7 @@ if __name__ == '__main__':
         tokenizer = RNATokenizer(args.vocab_path)
 
         ev = seq_cls_evaluator.RNAFMEvaluator(args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_eval)
+        ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'RNAMSM':
         args.max_seq_len = MAX_SEQ_LEN["RNAMSM"]
@@ -77,7 +78,7 @@ if __name__ == '__main__':
         tokenizer = RNATokenizer(args.vocab_path)
 
         ev = seq_cls_evaluator.RNAMsmEvaluator(args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_eval)
+        ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'DNABERT':
         args.max_seq_len = MAX_SEQ_LEN["DNABERT"]
@@ -88,7 +89,7 @@ if __name__ == '__main__':
 
         ev = seq_cls_evaluator.DNABERTEvaluatorSeqCls(
             args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_eval)
+        ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'SpliceBERT':
         args.max_seq_len = MAX_SEQ_LEN["SpliceBERT"]
@@ -99,17 +100,19 @@ if __name__ == '__main__':
 
         ev = seq_cls_evaluator.SpliceBERTEvaluatorSeqCls(
             args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_eval)
+        ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'RNAErnie':
         args.max_seq_len = MAX_SEQ_LEN["RNAErnie"]
         args.replace_T = True
         args.replace_U = False
 
-        tokenizer = RNATokenizer(args.vocab_path)
+        tokenizer = RNAErnieTokenizer.from_pretrained(
+            args.model_path,
+        )
         ev = seq_cls_evaluator.RNAErnieEvaluator(
             args, tokenizer=tokenizer)  # load tokenizer from model
-        ev.run(args, dataset_train, dataset_eval)
+        ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'DNABERT2':
         args.max_seq_len = MAX_SEQ_LEN["DNABERT2"]
@@ -120,4 +123,4 @@ if __name__ == '__main__':
 
         ev = seq_cls_evaluator.DNABERT2Evaluator(
             args, tokenizer=tokenizer)
-        ev.run(args, dataset_train, dataset_eval)
+        ev.run(args, dataset_train, dataset_test)

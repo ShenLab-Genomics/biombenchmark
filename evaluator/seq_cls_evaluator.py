@@ -1,9 +1,9 @@
+import os
 from tqdm import tqdm
 import time
 from collections import defaultdict
 import torch
 import numpy as np
-from transformers.models.bert.configuration_bert import BertConfig
 from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
@@ -13,6 +13,11 @@ from model.wrap_for_cls import DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForS
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
+from sklearn.metrics import (
+    roc_curve,
+    precision_recall_curve,
+    auc)
+
 
 LABEL2ID = {
     "nRC": {
@@ -42,14 +47,89 @@ LABEL2ID = {
 
 
 class SeqClsMetrics(BaseMetrics):
+    def __init__(self, metrics, save_path=None):
+        super().__init__(metrics)
+        self.save_path = save_path
+        if save_path is not None:
+            os.makedirs(save_path, exist_ok=True)
+
     def __call__(self, outputs, labels, epoch=0):
-        return super().__call__(outputs, labels)
+        """
+        Args:
+            kwargs: required args of model (dict)
+
+        Returns:
+            metrics in dict
+        """
+        preds = torch.argmax(outputs, axis=-1)
+        preds = preds.cpu().numpy().astype('int32')
+        labels = labels.cpu().numpy().astype('int32')
+
+        res = {}
+        for name in self.metrics:
+            func = getattr(self, name)
+            if func:
+                if (func == self.auc) or (func == self.pr_auc):
+                    # given two neural outputs, calculate their logits
+                    # and then calculate auc
+                    logits = torch.sigmoid(outputs).cpu().numpy()
+                    m = func(logits, labels)
+                else:
+                    m = func(preds, labels)
+                if isinstance(m, tuple) and len(m) > 1:
+                    res[name] = m[0]
+                    if self.save_path is not None:
+                        for idx, item in enumerate(m):
+                            fsave = os.path.join(
+                                self.save_path, f'epoch_{epoch}_{name}_{idx}')
+                            np.save(fsave, item)
+                else:
+                    res[name] = m
+            else:
+                raise NotImplementedError
+        return res
+
+    @staticmethod
+    def auc(preds, labels):
+        """
+        All args have same shapes.
+        Args:
+            preds: predictions of model, (batch_size, 1)
+            labels: ground truth, (batch_size, 1)
+
+        Returns:
+            precision
+        """
+        # labels += 1
+        preds = preds[:, 1]
+
+        fpr, tpr, _ = roc_curve(labels, preds)
+        return auc(fpr, tpr), fpr, tpr
+
+    @staticmethod
+    def pr_auc(preds, labels):
+        """
+        All args have same shapes.
+        Args:
+            preds: predictions of model, (batch_size, 1)
+            labels: ground truth, (batch_size, 1)
+
+        Returns:
+            precision
+        """
+        # labels += 1
+        preds = preds[:, 1]
+
+        precision, recall, _ = precision_recall_curve(labels, preds)
+
+        prauc = auc(recall, precision)
+        return prauc, precision, recall
 
 
 def seq2kmer(seq, kmer=1):
     kmer_text = ""
     i = 0
-    while i+kmer < len(seq):
+    while i+kmer <= len(seq):
         kmer_text += (seq[i: i + kmer] + " ")
         i += 1
     kmer_text = kmer_text.strip()
@@ -210,19 +290,22 @@ class SeqClsEvaluator:
             self.device = torch.device("cpu")
         self.tokenizer = tokenizer
 
-    def run(self, args, train_data, eval_data):
-        _loss_fn = SeqClsLoss().to(self.device)
-
-        # ========== Create the data collator
-        _collate_fn = SeqClsCollator(
+    def buildTrainer(self, args):
+        self._loss_fn = SeqClsLoss().to(self.device)
+        self._collate_fn = SeqClsCollator(
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
             label2id=LABEL2ID['nRC'], replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        self._metric = SeqClsMetrics(metrics=args.metrics,
+                                     save_path=f'{args.output_dir}/{args.method}')
 
-        # ========== Create the learning_rate scheduler (if need) and optimizer
-        optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
 
-        # ========== Create the metrics
-        _metric = SeqClsMetrics(metrics=args.metrics)
+    def run(self, args, train_data, eval_data):
+        self.buildTrainer(args)
 
         args.device = self.device
         # ========== Create the trainer
@@ -231,10 +314,10 @@ class SeqClsEvaluator:
             model=self.model,
             train_dataset=train_data,
             eval_dataset=eval_data,
-            data_collator=_collate_fn,
-            loss_fn=_loss_fn,
-            optimizer=optimizer,
-            compute_metrics=_metric,
+            data_collator=self._collate_fn,
+            loss_fn=self._loss_fn,
+            optimizer=self._optimizer,
+            compute_metrics=self._metric,
         )
 
         for i_epoch in range(args.num_train_epochs):
@@ -252,10 +335,6 @@ class RNABertEvaluator(SeqClsEvaluator):
         self.model = RNABertForSeqCls(self.model)
         self.model._load_pretrained_bert(args.model_path)
         self.model.to(self.device)
-        trainable_params = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
-        print("Trainable parameters: {}".format(trainable_params))
 
     def run(self, args, train_data, eval_data):
         super().run(args, train_data, eval_data)
@@ -296,10 +375,10 @@ class SpliceBERTEvaluatorSeqCls(DNABERTEvaluatorSeqCls):
 
 class RNAErnieEvaluator(SeqClsEvaluator):
     def __init__(self, args, tokenizer=None) -> None:
-        # tokenizer = AutoTokenizer.from_pretrained('model/pretrained/RNAErnie')
         super().__init__(tokenizer)
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            'model/pretrained/RNAErnie', num_labels=args.class_num)
+            args.model_path, num_labels=args.class_num
+        )
         self.model = RNAErnieForSeqCls(
             self.model).to(self.device)
 

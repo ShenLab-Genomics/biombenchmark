@@ -50,8 +50,9 @@ class M6APredMetrics(BaseMetrics):
 
         # preds = 1 / (1+np.exp(-preds))  # sigmoid
         labels = labels.cpu().numpy().astype('int32')
-        pred_score = torch.log_softmax(
-            outputs, dim=-1).cpu().numpy()
+        # pred_score = torch.log_softmax(
+        #     outputs, dim=-1).cpu().numpy()
+        pred_score = torch.softmax(outputs, dim=-1).cpu().numpy()
         pred_class = torch.argmax(
             outputs, axis=-1).cpu().numpy()
 
@@ -227,7 +228,7 @@ class DNABERT2Evaluator(M6APredEvaluator):
         super().__init__(tokenizer)
         # config = BertConfig.from_pretrained(args.model_path)
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_path, num_labels=args.class_num, trust_remote_code=True,
+            args.model_path, num_labels=2, trust_remote_code=True,
         )
         self.model = DNABERT2ForSeqCls(self.model).to(self.device)
 

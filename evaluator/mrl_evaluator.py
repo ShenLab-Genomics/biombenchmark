@@ -7,7 +7,7 @@ import time
 from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
 from collections import defaultdict
 from evaluator.base_evaluator import BaseMetrics
 from evaluator.seq_cls_evaluator import SeqClsTrainer, SeqClsCollator, SeqClsEvaluator, seq2kmer
@@ -69,7 +69,7 @@ class MRLMetrics(BaseMetrics):
         Returns:
             MSE
         """
-        return mean_squared_error(labels, logits)
+        return root_mean_squared_error(labels, logits)**2
 
     @staticmethod
     def mae(logits, labels):
@@ -133,11 +133,9 @@ class MRLCollator(SeqClsCollator):
             else:
                 kmer_text = seq
                 input_text = kmer_text
-            # input_text = "[CLS] " + kmer_text + " [SEP]"
             input_ids = self.tokenizer(input_text)["input_ids"]
             if None in input_ids:
-                # replace all None with 0
-                input_ids = [0 if x is None else x for x in input_ids]
+                raise ValueError("None in input_ids")
             input_ids_b.append(input_ids)
 
             label = raw_data["label"]
@@ -153,13 +151,9 @@ class MRLCollator(SeqClsCollator):
             input_ids = input_ids_b[i_batch]
             label = label_b[i_batch]
 
-            if len(input_ids) > self.max_seq_len:
-                # move [SEP] to end
-                # input_ids[self.max_seq_len-1] = input_ids[-1]
-                input_ids = input_ids[:self.max_seq_len]
+            input_ids = [0] * self.max_seq_len + input_ids
+            input_ids = input_ids[-self.max_seq_len:]
 
-            if len(input_ids) < self.max_seq_len:
-                input_ids += [0] * (self.max_seq_len - len(input_ids))
             input_ids_stack.append(input_ids)
             labels_stack.append(label)
 
@@ -199,7 +193,6 @@ class MRLEvaluator():
 
     def buildTrainer(self, args):
         self._loss_fn = MRLLoss().to(self.device)
-        # self._loss_fn = torch.nn.MSELoss().to(self.device)
         self._collate_fn = MRLCollator(
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
@@ -273,7 +266,7 @@ class DNABERT2Evaluator(MRLEvaluator):
         super().__init__(tokenizer=tokenizer)
         config = BertConfig.from_pretrained(args.model_path)
         self.model = AutoModel.from_pretrained(
-            args.model_path, trust_remote_code=True,config=config)
+            args.model_path, trust_remote_code=True, config=config)
         self.model = DNABERT2ForReg(self.model).to(self.device)
 
 
@@ -341,4 +334,4 @@ class UTRLMoriginalEvaluator(MRLEvaluator):
 class OptimusEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer=None):
         super().__init__(tokenizer=tokenizer)
-        self.model = Optimus(inp_len=104).to(self.device)
+        self.model = Optimus(inp_len=100).to(self.device)
