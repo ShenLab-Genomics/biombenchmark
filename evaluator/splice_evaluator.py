@@ -5,17 +5,19 @@ import torch
 import numpy as np
 from torch import nn
 import torch.nn.functional as F
+import model.RNAFM.fm as fm
 from model.BERT_like import RNATokenizer
 from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
-import model.RNAFM.fm as fm
 from model.BERT_like import SeqClsLoss
-from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls, RNAMsmForTokenCls
+from model.SpTransformer.sptransformer import Ex2
+from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls, RNAMsmForTokenCls, MAMBAForTokenCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
 from sklearn.metrics import average_precision_score, roc_auc_score
+from transformers import AutoTokenizer, Mamba2Config, Mamba2Model, MambaConfig, MambaModel
 
 
 class SpliceTokenClsLoss(nn.Module):
@@ -57,7 +59,7 @@ class SpliceTokenClsLoss(nn.Module):
 
 
 class SpliceMetrics(BaseMetrics):
-    def __call__(self, outputs, labels):
+    def __call__(self, outputs, labels, epoch=0):
         """
         Args:
             outputs: logits in tensor
@@ -185,8 +187,8 @@ class SpliceTrainer(BaseTrainer):
                     pbar.update(num_total)
                     num_total, loss_total = 0, 0
 
-                if i > 1000:
-                    break
+                # if i > 1000:
+                #     break
 
         time_ed = time.time() - time_st
         print('Train\tLoss: {:.6f}; Time: {:.4f}s'.format(
@@ -205,8 +207,8 @@ class SpliceTrainer(BaseTrainer):
                 with torch.no_grad():
                     logits = self.model(input_ids)
 
-                outputs_dataset.append(logits)
-                labels_dataset.append(labels)
+                outputs_dataset.append(logits.cpu().detach())
+                labels_dataset.append(labels.cpu().detach())
                 num_total += self.args.batch_size
 
                 if num_total >= self.args.logging_steps:
@@ -312,6 +314,14 @@ class SpliceOneHotCollator(BaseCollator):
     # One-hot encoding of the outputs: 0 is for no splice, 1 is for acceptor,
     # 2 is for donor and -1 is for padding.
 
+    char_map = {
+        'N': 0,
+        'A': 1,
+        'C': 2,
+        'G': 3,
+        'T': 4
+    }
+
     @staticmethod
     def one_hot_encode(X, use_map):
         return use_map[X.astype('int8')]
@@ -331,6 +341,7 @@ class SpliceOneHotCollator(BaseCollator):
             seq = seq.replace("U", "T")
             start = (len(seq) - self.max_seq_len)//2
             seq = seq[start:start+self.max_seq_len]
+            seq = np.array([self.char_map[x] for x in seq])
             input_ids = self.one_hot_encode(seq, self.IN_MAP)
             input_ids_stack.append(input_ids)
             labels_stack.append(data[1])
@@ -358,13 +369,18 @@ class SpliceEvaluator:
             self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
             self._metric = SpliceMetrics(metrics=args.metrics)
         elif mode == 'onehot':
-            self._loss_fn = SeqClsLoss().to(self.device)
+            self._loss_fn = SpliceTokenClsLoss().to(self.device)
             self._collate_fn = SpliceOneHotCollator(
                 max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
             self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
             self._metric = SpliceMetrics(metrics=args.metrics)
         else:
             raise ValueError("Invalid mode.")
+
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
 
     def run(self, args, train_data, eval_data):
         self.buildTrainer(args)
@@ -442,3 +458,45 @@ class RNAErnieEvaluator(SpliceEvaluator):
         self.model = RNAErnieForTokenCls(
             self.model, num_labels=args.class_num).to(self.device)
         self.mode = 'token'
+
+
+class SpTransformerEvaluator(SpliceEvaluator):
+
+    def __init__(self, args) -> None:
+        super().__init__(args, tokenizer=None)
+        tissue_num = args.class_num
+        save_dict = torch.load(
+            args.model_path, map_location='cpu')
+        if tissue_num == 18:
+            tissue_num = 15
+        elif tissue_num == 3:
+            save_dict["state_dict"].pop("usage.weight")
+            save_dict["state_dict"].pop("usage.bias")
+            tissue_num = 0
+        elif tissue_num == 56:
+            save_dict["state_dict"].pop("usage.weight")
+            save_dict["state_dict"].pop("usage.bias")
+            tissue_num = 53
+        self.model = Ex2(128, context_len=4250, tissue_num=tissue_num,
+                         max_seq_len=8192, attn_depth=8, training=False)
+
+        self.model.load_state_dict(save_dict["state_dict"], strict=False)
+        self.model.to(self.device)
+        self.mode = 'onehot'
+
+
+class RNAMAMBAEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer=None):
+        super().__init__(args, tokenizer)
+
+        config = Mamba2Config(
+            vocab_size=25,  # 词汇表大小
+            num_heads=16,
+            head_dim=64,
+            hidden_size=256,   # 隐藏层大小
+            num_hidden_layers=12,  # 隐藏层数量
+        )
+
+        # 使用配置创建模型，不加载预训练权重
+        self.model = Mamba2Model(config)
+        self.model = MAMBAForTokenCls(self.model).to(self.device)

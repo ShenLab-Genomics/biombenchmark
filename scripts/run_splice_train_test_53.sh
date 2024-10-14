@@ -1,5 +1,18 @@
 #!bash
 
+# SpliceBERT
+echo "SpliceBERT"
+python splice_cls.py --method SpliceBERT \
+    --model_path 'model/pretrained/SpliceBERT/models/SpliceBERT.510nt' \
+    --num_train_epochs 10 \
+    --class_num 56 \
+    --batch_size 12 \
+    --output_dir 'model/fine_tuned/Splicing/SpliceBERT_53class' \
+    --dataset_train 'dataset/splice_data/gtex_500_53tis/dataset_train.h5' \
+    --dataset_test 'dataset/splice_data/gtex_500_53tis/dataset_test.h5' \
+    --use_kmer 1 \
+    --logging_steps 500
+
 # RNAFM
 echo "RNAFM"
 python splice_cls.py --method RNAFM \
@@ -8,23 +21,14 @@ python splice_cls.py --method RNAFM \
     --model_config 'model/configs/RNAFM.json' \
     --num_train_epochs 10 \
     --class_num 56 \
-    --output_dir 'model/fine_tuned/Splicing/RNAFM' \
+    --batch_size 12 \
+    --output_dir 'model/fine_tuned/Splicing/RNAFM_53class' \
     --dataset_train 'dataset/splice_data/gtex_500_53tis/dataset_train.h5' \
     --dataset_test 'dataset/splice_data/gtex_500_53tis/dataset_test.h5' \
     --use_kmer 1 \
     --logging_steps 500
 
-# SpliceBERT
-echo "SpliceBERT"
-python splice_cls.py --method SpliceBERT \
-    --model_path 'model/pretrained/SpliceBERT/models/SpliceBERT.510nt' \
-    --num_train_epochs 10 \
-    --class_num 56 \
-    --output_dir 'model/fine_tuned/Splicing/SpliceBERT' \
-    --dataset_train 'dataset/splice_data/gtex_500_53tis/dataset_train_debug.h5' \
-    --dataset_test 'dataset/splice_data/gtex_500_53tis/dataset_test_debug.h5' \
-    --use_kmer 1 \
-    --logging_steps 500
+
     
 ## DNABERT
 # echo "DNABERT"

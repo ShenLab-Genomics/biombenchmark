@@ -1,3 +1,4 @@
+import os
 from tqdm import tqdm
 import torch
 import numpy as np
@@ -20,6 +21,7 @@ from sklearn.metrics import (
     recall_score,
     matthews_corrcoef,
     roc_auc_score,
+    roc_curve,
     precision_recall_curve,
     auc)
 
@@ -31,7 +33,13 @@ LABEL2ID = {
 
 
 class M6APredMetrics(BaseMetrics):
-    def __call__(self, outputs, labels):
+    def __init__(self, metrics, save_path=None):
+        super().__init__(metrics)
+        self.save_path = save_path
+        if save_path is not None:
+            os.makedirs(save_path, exist_ok=True)
+
+    def __call__(self, outputs, labels, epoch=0):
         """
         Args:
             kwargs: required args of model (dict)
@@ -57,7 +65,16 @@ class M6APredMetrics(BaseMetrics):
                     m = func(pred_score, labels)
                 else:
                     m = func(pred_class, labels)
-                res[name] = m
+
+                if isinstance(m, tuple) and len(m) > 1:
+                    res[name] = m[0]
+                    if self.save_path is not None:
+                        for idx, item in enumerate(m):
+                            fsave = os.path.join(
+                                self.save_path, f'epoch_{epoch}_{name}_{idx}')
+                            np.save(fsave, item)
+                else:
+                    res[name] = m
             else:
                 raise NotImplementedError
         return res
@@ -75,7 +92,9 @@ class M6APredMetrics(BaseMetrics):
         """
         # labels += 1
         preds = preds[:, 1]
-        return roc_auc_score(labels, preds)
+
+        fpr, tpr, _ = roc_curve(labels, preds)
+        return auc(fpr, tpr), fpr, tpr
 
     @staticmethod
     def pr_auc(preds, labels):
@@ -92,8 +111,9 @@ class M6APredMetrics(BaseMetrics):
         preds = preds[:, 1]
 
         precision, recall, _ = precision_recall_curve(labels, preds)
+
         prauc = auc(recall, precision)
-        return prauc
+        return prauc, precision, recall
 
 
 class M6APredCollator(SeqClsCollator):
@@ -132,7 +152,8 @@ class M6APredEvaluator():
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
             label2id=LABEL2ID, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
-        self._metric = M6APredMetrics(metrics=args.metrics)
+        self._metric = M6APredMetrics(metrics=args.metrics,
+                                      save_path=f'{args.output_dir}/{args.method}')
 
         trainable_params = sum(
             p.numel() for p in self.model.parameters() if p.requires_grad
@@ -158,18 +179,47 @@ class M6APredEvaluator():
             self.seq_cls_trainer.eval(i_epoch)
 
 
+#### Evaluator for models ####
+
+class RNAFMEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
+        self.model = RNAFmForSeqCls(self.model, class_num=2)
+        self.model.to(self.device)
+
+
+class RNAMsmEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        model_config = get_config(args.model_config)
+        self.model = MSATransformer(**model_config)
+        self.model = RNAMsmForSeqCls(self.model, class_num=2)
+        self.model._load_pretrained_bert(
+            args.model_path)
+        self.model.to(self.device)
+
+
+class RNABertEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        # ========== Build tokenizer, model, criterion
+        model_config = get_config(args.model_config)
+        self.model = BertModel(model_config)
+        self.model = RNABertForM6ACls(self.model, class_num=2)
+        if args.model_path:
+            self.model._load_pretrained_bert(args.model_path)
+        else:
+            print('Use un-pretrained model')
+        self.model.to(self.device)
+
+
 class DNABERTEvaluator(M6APredEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=2).to(self.device)
         self.model = DNABERTForSeqCls(self.model)
-
-
-class SpliceBERTEvaluator(DNABERTEvaluator):
-    # SpliceBERT和DNABERT结构相同，权重不同
-    def __init__(self, args, tokenizer) -> None:
-        super().__init__(args, tokenizer=tokenizer)
 
 
 class DNABERT2Evaluator(M6APredEvaluator):
@@ -182,12 +232,20 @@ class DNABERT2Evaluator(M6APredEvaluator):
         self.model = DNABERT2ForSeqCls(self.model).to(self.device)
 
 
-class RNAFMEvaluator(M6APredEvaluator):
+class SpliceBERTEvaluator(DNABERTEvaluator):
+    # SpliceBERT和DNABERT结构相同，权重不同
     def __init__(self, args, tokenizer) -> None:
-        super().__init__(tokenizer=tokenizer)
-        self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
-        self.model = RNAFmForSeqCls(self.model, class_num=2)
-        self.model.to(self.device)
+        super().__init__(args, tokenizer=tokenizer)
+
+
+class RNAErnieEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer=None) -> None:
+        super().__init__(tokenizer)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num
+        )
+        self.model = RNAErnieForSeqCls(
+            self.model).to(self.device)
 
 
 class DeepM6ASeqEvaluator(M6APredEvaluator):
@@ -211,38 +269,3 @@ class DeepM6ASeqEvaluator(M6APredEvaluator):
         super().__init__(tokenizer=one_hot_embed)
         self.model = model.DeepM6ASeq.model.ConvNet_BiLSTM(
             output_dim=2, args=args, wordvec_len=4).to(self.device)
-
-
-class RNABertEvaluator(M6APredEvaluator):
-    def __init__(self, args, tokenizer) -> None:
-        super().__init__(tokenizer=tokenizer)
-        # ========== Build tokenizer, model, criterion
-        model_config = get_config(args.model_config)
-        self.model = BertModel(model_config)
-        self.model = RNABertForM6ACls(self.model, class_num=2)
-        if args.model_path:
-            self.model._load_pretrained_bert(args.model_path)
-        else:
-            print('Use un-pretrained model')
-        self.model.to(self.device)
-
-
-class RNAMsmEvaluator(M6APredEvaluator):
-    def __init__(self, args, tokenizer) -> None:
-        super().__init__(tokenizer=tokenizer)
-        model_config = get_config(args.model_config)
-        self.model = MSATransformer(**model_config)
-        self.model = RNAMsmForSeqCls(self.model,class_num=2)
-        self.model._load_pretrained_bert(
-            args.model_path)
-        self.model.to(self.device)
-
-
-class RNAErnieEvaluator(M6APredEvaluator):
-    def __init__(self, args, tokenizer=None) -> None:
-        super().__init__(tokenizer)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_path, num_labels=args.class_num
-        )
-        self.model = RNAErnieForSeqCls(
-            self.model).to(self.device)

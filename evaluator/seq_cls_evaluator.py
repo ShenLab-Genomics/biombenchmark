@@ -42,7 +42,7 @@ LABEL2ID = {
 
 
 class SeqClsMetrics(BaseMetrics):
-    def __call__(self, outputs, labels):
+    def __call__(self, outputs, labels, epoch=0):
         return super().__call__(outputs, labels)
 
 
@@ -179,7 +179,8 @@ class SeqClsTrainer(BaseTrainer):
         outputs_dataset = torch.concat(outputs_dataset, axis=0)
         labels_dataset = torch.concat(labels_dataset, axis=0)
         # save best model
-        metrics_dataset = self.compute_metrics(outputs_dataset, labels_dataset)
+        metrics_dataset = self.compute_metrics(outputs_dataset, labels_dataset,
+                                               epoch=epoch)
 
         # log results to screen/bash
         results = {}
