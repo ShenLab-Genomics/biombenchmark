@@ -14,10 +14,10 @@ from model.BERT_like import SeqClsLoss
 from model.SpTransformer.sptransformer import Ex2
 from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls, RNAMsmForTokenCls, MAMBAForTokenCls
 from torch.optim import AdamW
-from transformers import AutoTokenizer, AutoModelForTokenClassification
+from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModel
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
 from sklearn.metrics import average_precision_score, roc_auc_score
-from transformers import AutoTokenizer, Mamba2Config, Mamba2Model, MambaConfig, MambaModel
+from transformers import AutoTokenizer, MambaConfig, MambaModel
 
 
 class SpliceTokenClsLoss(nn.Module):
@@ -187,6 +187,7 @@ class SpliceTrainer(BaseTrainer):
                     pbar.update(num_total)
                     num_total, loss_total = 0, 0
 
+                # print(i)
                 # if i > 1000:
                 #     break
 
@@ -400,8 +401,12 @@ class SpliceEvaluator:
             self.token_cls_trainer.train(i_epoch)
             self.token_cls_trainer.eval(i_epoch)
             if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
-                self.token_cls_trainer.save_model(
-                    args.output_dir, i_epoch)
+                try:
+                    self.token_cls_trainer.save_model(
+                        args.output_dir, i_epoch)
+                except Exception as e:
+                    print(e)
+                    print("Failed to save model.")
 
 
 class SpliceBERTEvaluator(SpliceEvaluator):
@@ -452,8 +457,11 @@ class RNAMSMEvaluator(SpliceEvaluator):
 class RNAErnieEvaluator(SpliceEvaluator):
     def __init__(self, args, tokenizer=None) -> None:
         super().__init__(args, tokenizer)
-        self.model = AutoModelForTokenClassification.from_pretrained(
-            args.model_path, num_labels=args.class_num
+        # self.model = AutoModelForTokenClassification.from_pretrained(
+        #     args.model_path, num_labels=args.class_num
+        # )
+        self.model = AutoModel.from_pretrained(
+            args.model_path
         )
         self.model = RNAErnieForTokenCls(
             self.model, num_labels=args.class_num).to(self.device)
@@ -474,8 +482,12 @@ class SpTransformerEvaluator(SpliceEvaluator):
             save_dict["state_dict"].pop("usage.bias")
             tissue_num = 0
         elif tissue_num == 56:
-            save_dict["state_dict"].pop("usage.weight")
-            save_dict["state_dict"].pop("usage.bias")
+            # save_dict["state_dict"].pop()
+            # save_dict["state_dict"].pop("usage.weight")
+            # save_dict["state_dict"].pop("usage.bias")
+            for k in list(save_dict["state_dict"].keys()):
+                if "encoder." not in k:
+                    save_dict["state_dict"].pop(k)
             tissue_num = 53
         self.model = Ex2(128, context_len=4250, tissue_num=tissue_num,
                          max_seq_len=8192, attn_depth=8, training=False)
@@ -485,6 +497,7 @@ class SpTransformerEvaluator(SpliceEvaluator):
         self.mode = 'onehot'
 
 
+'''
 class RNAMAMBAEvaluator(SpliceEvaluator):
     def __init__(self, args, tokenizer=None):
         super().__init__(args, tokenizer)
@@ -500,3 +513,4 @@ class RNAMAMBAEvaluator(SpliceEvaluator):
         # 使用配置创建模型，不加载预训练权重
         self.model = Mamba2Model(config)
         self.model = MAMBAForTokenCls(self.model).to(self.device)
+'''
