@@ -260,32 +260,35 @@ if __name__ == '__main__':
         description='Process some chromosomes based on the given mode.')
 
     # Adding the first argument for the operation mode
-    parser.add_argument('--mode', choices=['train', 'test', 'train_debug', 'test_debug', 'all'],
+    parser.add_argument('--mode', choices=['train', 'test', 'train_debug', 'test_debug', 'all','test_small','train_small'],
                         help='The mode of operation. Can be train, test, test_single or all.')
     parser.add_argument(
         '-c', '--config', default='dataset/splice_data/configs_15tissue.yaml',
         help='The config file containing path of required files')
-
-    # # Adding the second argument for the flag
-    # parser.add_argument('flag', choices=['0', '1', 'all'],
-    #                     help='A flag to control certain behaviors. Can be 0, 1 or all.')
-
+    
     args = parser.parse_args()
-    flag = 1
+    use_paralog = 1
     if args.mode == 'train':
         CHROM_GROUP = ['chr11', 'chr13', 'chr15', 'chr17', 'chr19', 'chr21',
                        'chr2', 'chr4', 'chr6', 'chr8', 'chr10', 'chr12',
                        'chr14', 'chr16', 'chr18', 'chr20', 'chr22', 'chrX', 'chrY']
     elif args.mode == 'test':
         CHROM_GROUP = ['chr1', 'chr3', 'chr5', 'chr7', 'chr9']
-        flag = 0
+        use_paralog = 0
 
     elif args.mode == 'train_debug':
         CHROM_GROUP = ['chr2']
 
     elif args.mode == 'test_debug':
         CHROM_GROUP = ['chr1']
-        flag = 0
+        use_paralog = 0
+
+    elif args.mode == 'train_small':
+        CHROM_GROUP = ['chr2', 'chr4', 'chr6', 'chr8', 'chr10']
+
+    elif args.mode == 'test_small':
+        CHROM_GROUP = ['chr1']
+        use_paralog = 0
 
     else:  # args.mode == 'all'
         CHROM_GROUP = ['chr1', 'chr3', 'chr5', 'chr7', 'chr9',
@@ -328,7 +331,7 @@ if __name__ == '__main__':
     ##
 
     # You can access the arguments like this:
-    print(f"Mode: {args.mode}, Flag: {flag}, Config:{args.config}")
+    print(f"Mode: {args.mode}, Paralog: {use_paralog}, Config:{args.config}")
     print(f"Chromosomes selected: {CHROM_GROUP}")
 
     TISSUE_CNT = len(configs['tissue_dict'])
@@ -374,7 +377,7 @@ if __name__ == '__main__':
                     continue
                 usage_label = np.sum([row[tag_listL], row[tag_listR]])
                 paralog = row['paralog']
-                if ((paralog == 1) and (sys.argv[2] == '0')):
+                if ((paralog == 1) and (use_paralog == 0)):
                     break
                 cnt += 1
                 if row['strand'] == 1:  # positive 正链
@@ -408,8 +411,9 @@ if __name__ == '__main__':
                 X_batch.extend(Xd)
                 Y_batch.extend(Yd)
 
+            if len(X_batch) == 0:
+                continue
             batch_cnt += 1
-
             h5f2.create_dataset('X' + str(batch_cnt), data=X_batch)
             h5f2.create_dataset('Y' + str(batch_cnt), data=Y_batch)
 
@@ -417,6 +421,5 @@ if __name__ == '__main__':
 
             if ('debug' in args.mode) and (batch_cnt > 200):
                 break
-        flag = 0
     h5f2.close()
     pass

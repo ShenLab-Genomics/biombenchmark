@@ -1,0 +1,74 @@
+source_data:
+  sample_list: './required_files/GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt' # tissue type annotation
+  paralog_data: './required_files/mart_export_paralog.txt' # To exclude paralog from test dataset
+  gene_strand_data: './required_files/mart_export_strand.txt' # gene strand annotation
+  data_path : '/public/home/shenninggroup/yny/data/gtexv8' # raw data path (not required)
+
+ref_genome: ./required_files/hg38.fa # reference genome
+tissue_data_folder: ./gtex_500_15tis_small # output
+context_len: 4750 # context length for each segment   <- modify this to change sequence length
+center_len: 500 # interested region for each segment
+
+chr_path:
+  '1': chr1.csv
+  '2': chr2.csv
+  '3': chr3.csv
+  '4': chr4.csv
+  '5': chr5.csv
+  '6': chr6.csv
+  '7': chr7.csv
+  '8': chr8.csv
+  '9': chr9.csv
+  '10': chr10.csv
+  '11': chr11.csv
+  '12': chr12.csv
+  '13': chr13.csv
+  '14': chr14.csv
+  '15': chr15.csv
+  '16': chr16.csv
+  '17': chr17.csv
+  '18': chr18.csv
+  '19': chr19.csv
+  '20': chr20.csv
+  '21': chr21.csv
+  '22': chr22.csv
+  'X': chrX.csv
+  'Y': chrY.csv
+
+class_type: 'group'
+
+
+tissue_dict_rev:
+    'Adipose Tissue': 0
+    'Blood': 1
+    'Blood Vessel': 2
+    'Brain': 3
+    'Colon': 4
+    'Heart': 5
+    'Kidney': 6
+    'Liver': 7
+    'Lung': 8
+    'Muscle': 9
+    'Nerve': 10
+    'Small Intestine': 11
+    'Skin': 12
+    'Spleen': 13
+    'Stomach': 14
+
+
+tissue_dict:
+    0: 'Adipose Tissue'
+    1: 'Blood'
+    2: 'Blood Vessel'
+    3: 'Brain'
+    4: 'Colon'
+    5: 'Heart'
+    6: 'Kidney'
+    7: 'Liver'
+    8: 'Lung'
+    9: 'Muscle'
+    10: 'Nerve'
+    11: 'Small Intestine'
+    12: 'Skin'
+    13: 'Spleen'
+    14: 'Stomach'

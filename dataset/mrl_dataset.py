@@ -108,7 +108,6 @@ class MRLDataset(BaseDataset):
         elif split_name == "test":
             train_data_100 = mpra_data_varlen[(mpra_data_varlen.set == "test") & (
                 mpra_data_varlen.library == "human")]
-        print(train_data_100.shape)
 
         self.set_name = split_name
         self.seqs = train_data_100['utr'].values
