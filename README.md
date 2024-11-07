@@ -2,6 +2,14 @@
 
 ## Run pipelines
 
+## Setting up
+
+We suggest using conda to manage code environments:
+
+```bash
+conda env create -f environment_1019.yml
+```
+
 #### nRC prediction
 
 To train and test all supported models, run `scripts/run_seq_cls_test.sh`

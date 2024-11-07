@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, BertForMaskedLM, AutoModelForTokenClassification
 
 
 class RNAFmForTokenCls(nn.Module):
@@ -26,7 +26,7 @@ class RNAMsmForTokenCls(nn.Module):
         super(RNAMsmForTokenCls, self).__init__()
         self.bert = bert
         self.classifier = nn.Linear(hidden_size, num_labels)
-        self.pad = 6  # 511 -> 500
+        self.pad = 6  # 512 -> 500
 
     def _load_pretrained_bert(self, path):
         self.load_state_dict(torch.load(
@@ -62,16 +62,16 @@ class RNAErnieForTokenCls(nn.Module):
     def __init__(self, model, hidden_size=768, num_labels=3) -> None:
         super().__init__()
         self.model = model
-        self.pad = (512 - 500) // 2
+        # self.classifier = nn.Linear(hidden_size, num_labels)
+        self.pad = (510 - 500) // 2
 
     def forward(self, input_ids):
-        input_ids = input_ids[:, 1:]  # drop the first [CLS]
-        # print(input_ids.shape)
-        # print(input_ids)
-        logits = self.model(input_ids).logits
-        # print(logits.shape)
+        input_ids = input_ids[:, 1:-1]  # drop the first [CLS]
+        # logits = self.model(input_ids, attention_mask=input_ids > 0)[
+        #     'last_hidden_state']
+        logits = self.model(input_ids, attention_mask=input_ids > 0).logits
         logits = logits[:, self.pad:-self.pad, :].transpose(1, 2)
-        # print(logits.shape)
+        # logits = self.classifier(logits).transpose(1, 2)
         return logits
 
 

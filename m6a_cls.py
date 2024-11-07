@@ -4,6 +4,7 @@ from evaluator import m6a_evaluator
 from dataset import m6a_dataset
 from model.BERT_like import RNATokenizer
 from model.RNAErnie.tokenization_rnaernie import RNAErnieTokenizer
+import torch
 
 MAX_SEQ_LEN = {"RNABERT": 440,
                "RNAMSM": 512,
@@ -43,7 +44,8 @@ if __name__ == '__main__':
     parser.add_argument("--output_dir", default=False)
     parser.add_argument("--model_config", default=False)
     parser.add_argument("--vocab_path", default='model/RNABERT/vocab.txt')
-    parser.add_argument("--use_kmer", default=0, type=int)
+    parser.add_argument("--use_kmer", default=1, type=int)
+    parser.add_argument("--pad_token_id", default=0, type=int)
     parser.add_argument("--dataset_train", type=str)
     parser.add_argument("--dataset_test", type=str)
     parser.add_argument('--metrics', type=str2list,
@@ -53,9 +55,17 @@ if __name__ == '__main__':
 
     assert args.output_dir, "output_dir is required."
 
+
+    ###
+    seed = 2024
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    ###
+
+
     # Special case
-    if '101bp' in args.dataset_train:
-        MAX_SEQ_LEN[args.method] = 101
+    if ('101bp' in args.dataset_train) and (MAX_SEQ_LEN[args.method]>103):
+        MAX_SEQ_LEN[args.method] = 103
     ##
 
     dataset_train = m6a_dataset.M6ADataset(

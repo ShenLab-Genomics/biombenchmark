@@ -4,6 +4,7 @@ from evaluator import seq_cls_evaluator
 from dataset import seq_cls_dataset
 from model.BERT_like import RNATokenizer
 from model.RNAErnie.tokenization_rnaernie import RNAErnieTokenizer
+import torch
 
 MAX_SEQ_LEN = {"RNABERT": 440,
                "RNAMSM": 512,
@@ -42,11 +43,19 @@ if __name__ == '__main__':
     parser.add_argument("--model_config", default=False)
     parser.add_argument("--vocab_path", default='model/RNABERT/vocab.txt')
     parser.add_argument("--use_kmer", default=1, type=int)
+    parser.add_argument("--pad_token_id", default=0, type=int)
     parser.add_argument("--dataset", type=str)
     parser.add_argument('--metrics', type=str2list,
-                        default="F1s,Precision,Recall,Accuracy,Mcc",)
+                        default="F1s,Precision,Recall,Accuracy,Mcc",)  # optional: Emb
+    parser.add_argument("--extract_emb", default=False)
 
     args = parser.parse_args()
+
+    ###
+    seed = 2024
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    ###
 
     dataset_train = seq_cls_dataset.SeqClsDataset(
         fasta_dir=args.dataset, prefix='nRC')

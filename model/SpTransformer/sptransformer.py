@@ -161,7 +161,8 @@ class Ex2(nn.Module):
         self.attn = AttnBlock(
             dim*2, depth=attn_depth, max_seq_len=self.max_seq_len)
         self.splice = nn.Conv1d(dim*2, 3, 1)
-        self.usage = nn.Conv1d(dim*2, tissue_num, 1)
+        if tissue_num > 0:
+            self.usage = nn.Conv1d(dim*2, tissue_num, 1)
 
     def load_pretrain(self, training=False):
         model1 = SpEncoder_L(128, tissue_cnt=self.tissue_num,
@@ -184,6 +185,7 @@ class Ex2(nn.Module):
         return nn.ModuleList([model1, model2])
 
     def forward(self, x):
+        x = x.float()
         target_output_len = x.size(2) - 2 * self.context_len
         target_mid_len = self.max_seq_len
         odd_fix = x.size(2) & 1
@@ -201,15 +203,16 @@ class Ex2(nn.Module):
                       2, -(seq_len-target_mid_len)//2+odd_fix))
         #
         emb = torch.concat([feat1, feat2], dim=1)
-        # print(emb)
         emb = self.conv2(emb)
         attn = self.attn(emb)
-        # print(attn)
 
         splice_out = self.splice(attn)
-        usage_out = self.usage(attn)
 
-        out = torch.concat([splice_out, usage_out], dim=1)
+        if self.tissue_num > 0:
+            usage_out = self.usage(attn)
+            out = usage_out
+        else:
+            out = splice_out
 
         seq_len = out.size(2)
         out = F.pad(out, (-(seq_len-target_output_len) //

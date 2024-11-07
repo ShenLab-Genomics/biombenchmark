@@ -73,24 +73,153 @@ def create_1dcnn_for_emd(in_planes, out_planes):
     return emb_cnn
 
 
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        nn.init.normal_(m.weight, std=0.001)
+        if isinstance(m.bias, nn.Parameter):
+            nn.init.constant_(m.bias, 0.0)
+    elif classname.find('Conv') != -1:
+        nn.init.kaiming_normal_(m.weight, a=0, mode='fan_in')
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0.0)
+    elif classname.find('BatchNorm') != -1:
+        if m.affine:
+            nn.init.constant_(m.weight, 1.0)
+            nn.init.constant_(m.bias, 0.0)
+
+
+class PreEncoder(nn.Module):
+    def __init__(self, base_token=5):
+        super(PreEncoder, self).__init__()
+        self.base_token = base_token
+
+    def forward(self, input_ids):
+        # covert token for RNA-FM (20 tokens) to nest version (4 tokens A,U,C,G)
+        # nest_tokens = (input_ids[:, 1:-1] - 4)
+
+        # assume input_ids only contains token for A U C G
+        nest_tokens = (input_ids[:, :] - 4)
+        token_padding_mask = nest_tokens.ge(0).long()
+        one_hot_tokens = torch.nn.functional.one_hot(
+            (nest_tokens * token_padding_mask), num_classes=4)
+        one_hot_tokens = one_hot_tokens.float() * token_padding_mask.unsqueeze(-1)
+        one_hot_tokens = one_hot_tokens.permute(0, 2, 1)
+
+        return one_hot_tokens
+
+
 class RNAFmForReg(nn.Module):
     def __init__(self, bert, hidden_size=640):
         super(RNAFmForReg, self).__init__()
         self.bert = bert
-        self.predictor = create_1dcnn_for_emd(hidden_size, 1)
+        self.predictor = create_1dcnn_for_emd(640, 1)
 
     def _load_pretrained_bert(self, path):
         self.load_state_dict(torch.load(path, map_location="cpu"), strict=True)
 
     def forward(self, input_ids):
+        input_ids = input_ids[:, 1:]
+
         with torch.no_grad():
-            output = self.bert(input_ids, repr_layers=[12])
-        representations = output["representations"][12][:, :, :].transpose(
-            1, 2)
-        # print(representations.shape)
+            self.bert.eval()
+            output = self.bert(input_ids, need_head_weights=False, repr_layers=[
+                12], return_contacts=False)
+
+            representations = output["representations"][12][:, :, :]
+            representations = representations.transpose(1, 2)
+
         logits = self.predictor(representations).squeeze(-1)
-        # logits = logits[:, 1 + self.pad:-self.pad, :].transpose(1, 2)
-        # print(logits.shape)
+        return logits
+
+
+class RNAErnieForReg(nn.Module):
+    def __init__(self, bert):
+        super().__init__()
+        self.bert = bert
+        self.predictor = create_1dcnn_for_emd(768, 1)
+
+    def forward(self, input_ids):
+        with torch.no_grad():
+            logits = self.bert(input_ids, attention_mask=input_ids > 0)[
+                'last_hidden_state']
+        logits = self.predictor(logits.transpose(
+            1, 2)).squeeze(-1)
+        return logits
+
+
+class RNAMsmForReg(nn.Module):
+    def __init__(self, bert, hidden_size=768, class_num=1):
+        super(RNAMsmForReg, self).__init__()
+        self.bert = bert
+        self.predictor = create_1dcnn_for_emd(hidden_size, 1)
+        # self.classifier = nn.Linear(hidden_size, class_num)
+
+    def _load_pretrained_bert(self, path):
+        self.load_state_dict(torch.load(
+            path, map_location="cpu"), strict=False)
+
+    def forward(self, input_ids):
+        with torch.no_grad():
+            output = self.bert(input_ids, repr_layers=[10])
+        representations = output["representations"][10][:, 0, :, :].transpose(
+            1, 2)
+        logits = self.predictor(representations).squeeze(-1)
+        return logits
+
+
+class RNABERTForReg(nn.Module):
+    def __init__(self, bert, hidden_size=120):
+        super(RNABERTForReg, self).__init__()
+        self.bert = bert
+        self.predictor = create_1dcnn_for_emd(hidden_size, 1)
+
+    def _load_pretrained_bert(self, path):
+        self.load_state_dict(torch.load(
+            path, map_location="cpu"), strict=False)
+
+    def forward(self, input_ids):
+        with torch.no_grad():
+            encoded_layers, pooled_output = self.bert(
+                input_ids, output_all_encoded_layers=False)
+        logits = self.predictor(encoded_layers.transpose(
+            1, 2)).squeeze(-1)
+        return logits
+
+
+class DNABERTForReg(nn.Module):
+    def __init__(self, model, args):
+        super(DNABERTForReg, self).__init__()
+        self.model = model
+        in_features = 768 if args.method == 'DNABERT' else 512
+        self.predictor = create_1dcnn_for_emd(in_features, 1)
+
+    def forward(self, input_ids):
+        input_ids = input_ids[:, 1:]
+        with torch.no_grad():
+            # logits = self.model(input_ids, attention_mask=input_ids > 0)[
+            #     'last_hidden_state']
+            logits = self.model(input_ids)[
+                'last_hidden_state']
+        logits = self.predictor(logits.transpose(
+            1, 2)).squeeze(-1)
+        return logits
+
+
+class DNABERT2ForReg(nn.Module):
+    def __init__(self, model):
+        super(DNABERT2ForReg, self).__init__()
+        self.predictor = create_1dcnn_for_emd(768, 1)
+        self.model = model
+
+    def forward(self, input_ids):
+        input_ids = input_ids[:, 1:]
+        with torch.no_grad():
+            # logits = self.model(input_ids)[
+            #     'last_hidden_state']
+            logits = self.model(input_ids, attention_mask=input_ids > 0)[0]
+        logits = self.predictor(logits.transpose(
+            1, 2)).squeeze(-1)
         return logits
 
 
@@ -121,8 +250,57 @@ class UTRLMForReg(nn.Module):
         super(UTRLMForReg, self).__init__()
 
         self.model = backbone
+        self.predictor = create_1dcnn_for_emd(128, 1)
 
-    def forward(self, x):
-        logits = self.model(x).logits
-        # print(logits)
+    def forward(self, input_ids):
+        with torch.no_grad():
+            logits = self.model(input_ids, attention_mask=input_ids > 0)[
+                'last_hidden_state']
+        # logits = self.model(x)[
+        #     'last_hidden_state']
+        logits = self.predictor(logits.transpose(
+            1, 2)).squeeze(-1)
+        return logits
+
+
+class Optimus(nn.Module):
+    def __init__(self, inp_len=50, nodes=40, layers=3, filter_len=8, nbr_filters=120,
+                 dropout1=0, dropout2=0, dropout3=0.2, base_token=5):
+        super(Optimus, self).__init__()
+        self.base_token = base_token
+
+        self.model = nn.Sequential()
+        # 1
+        self.model.add_module('conv1', nn.Conv1d(
+            4, nbr_filters, filter_len, padding='same', padding_mode='replicate'))
+        self.model.add_module('relu1', nn.ReLU())
+        # 2
+        self.model.add_module('conv2', nn.Conv1d(
+            nbr_filters, nbr_filters, filter_len, padding='same', padding_mode='replicate'))
+        self.model.add_module('relu2', nn.ReLU())
+        self.model.add_module('drop2', nn.Dropout(p=dropout1))
+        # 3
+        self.model.add_module('conv3', nn.Conv1d(
+            nbr_filters, nbr_filters, filter_len, padding='same', padding_mode='replicate'))
+        self.model.add_module('relu3', nn.ReLU())
+        self.model.add_module('drop3', nn.Dropout(p=dropout2))
+
+        self.model.add_module('flatten', nn.Flatten())
+
+        # Add the fully connected layers
+        self.model.add_module('fc1', nn.Linear(inp_len * nbr_filters, nodes))
+        self.model.add_module('relu_fc', nn.ReLU())
+        self.model.add_module('dropout_fc', nn.Dropout(p=dropout3))
+        self.model.add_module('fc2', nn.Linear(nodes, 1))
+
+    def forward(self, input_ids):
+        # convert token for RNA-FM to one-hot encoding
+        nest_tokens = (input_ids[:, 1:] - 4)  # drop the first [CLS] token
+        token_padding_mask = nest_tokens.ge(0).long()
+        one_hot_tokens = torch.nn.functional.one_hot(
+            (nest_tokens * token_padding_mask), num_classes=4)
+        one_hot_tokens = one_hot_tokens.float() * token_padding_mask.unsqueeze(-1)
+        one_hot_tokens = one_hot_tokens.permute(0, 2, 1)
+
+        logits = self.model(one_hot_tokens)[:, 0]
         return logits
