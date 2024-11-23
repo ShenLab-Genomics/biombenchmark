@@ -15,7 +15,7 @@ import model.RNAFM.fm as fm
 from model.wrap_for_cls import DNABERTForSeqCls
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel
 from torch.optim import AdamW
-from model.wrap_for_mrl import RNAFmForReg, PureReg, UTRLMForReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus
+from model.wrap_for_mrl import RNAFmForReg, RNAErnieForReg, PureReg, UTRLMForReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus
 from model.UTRlm import utrlm
 import scipy.stats as stats
 from sklearn import preprocessing
@@ -114,9 +114,9 @@ class MRLMetrics(BaseMetrics):
 
 class MRLCollator(SeqClsCollator):
     def __init__(self, max_seq_len, tokenizer,
-                 replace_T=True, replace_U=False, use_kmer=True):
+                 replace_T=True, replace_U=False, use_kmer=True, pad_token_id=0):
         super(MRLCollator, self).__init__(max_seq_len, tokenizer, None,
-                                          replace_T, replace_U, use_kmer)
+                                          replace_T, replace_U, use_kmer, pad_token_id)
 
     def __call__(self, raw_data_b):
         # print('raw:', raw_data_b)
@@ -151,7 +151,7 @@ class MRLCollator(SeqClsCollator):
             input_ids = input_ids_b[i_batch]
             label = label_b[i_batch]
 
-            input_ids = [0] * self.max_seq_len + input_ids
+            input_ids = [self.pad_token_id] * self.max_seq_len + input_ids
             input_ids = input_ids[-self.max_seq_len:]
 
             input_ids_stack.append(input_ids)
@@ -194,7 +194,12 @@ class MRLEvaluator():
     def buildTrainer(self, args):
         self._loss_fn = MRLLoss().to(self.device)
         self._collate_fn = MRLCollator(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+            max_seq_len=args.max_seq_len,
+            tokenizer=self.tokenizer,
+            replace_T=args.replace_T,
+            replace_U=args.replace_U,
+            use_kmer=args.use_kmer,
+            pad_token_id=args.pad_token_id)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
         self._metric = MRLMetrics(metrics=args.metrics)
 
@@ -227,8 +232,15 @@ class RNAFMEvaluator(MRLEvaluator):
         super().__init__(tokenizer=tokenizer)
         self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
         self.model = RNAFmForReg(self.model)
-        self.model.apply(weights_init)
+        # self.model.apply(weights_init)
         self.model.to(self.device)
+
+
+class RNAErnieEvaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer=None) -> None:
+        super().__init__(tokenizer)
+        self.model = AutoModel.from_pretrained(args.model_path)
+        self.model = RNAErnieForReg(self.model).to(self.device)
 
 
 class RNAMsmEvaluator(MRLEvaluator):

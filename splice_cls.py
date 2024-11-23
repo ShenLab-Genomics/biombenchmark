@@ -14,8 +14,9 @@ MAX_SEQ_LEN = {"RNAMSM": 512,
                "RNAErnie": 510,
                "SpTransformer": 9000,
                "SpliceAI": 9000,
+               "Pangolin": 9000,
                "SpTransformer_raw": 9000,
-               "SpTransformer_short": 512
+               "SpTransformer_short": 512,
                }
 
 
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='')
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'SpliceAI', 'SpTransformer', 'RNAErnieRaw', 'SpTransformer_short','SpTransformer_raw'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'SpliceAI', 'SpTransformer', 'RNAErnieRaw', 'SpTransformer_short', 'SpTransformer_raw', 'Pangolin','SpliceAI_short'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -138,7 +139,7 @@ if __name__ == '__main__':
 
         ev = splice_evaluator.SpTransformerEvaluator(args)
         ev.run(args, dataset_train, dataset_test)
-    
+
     if args.method == 'SpTransformer_raw':
         args.max_seq_len = MAX_SEQ_LEN["SpTransformer"]
         args.replace_T = False
@@ -153,4 +154,20 @@ if __name__ == '__main__':
         args.replace_U = True
 
         ev = splice_evaluator.SpliceAIEvaluator(args)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'SpliceAI_short':
+        args.max_seq_len = MAX_SEQ_LEN["SpTransformer_short"]
+        args.replace_T = False
+        args.replace_U = True
+
+        ev = splice_evaluator.SpliceAIShortEvaluator(args)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'Pangolin':
+        args.max_seq_len = MAX_SEQ_LEN["Pangolin"]
+        args.replace_T = False
+        args.replace_U = True
+
+        ev = splice_evaluator.PangolinEvaluator(args)
         ev.run(args, dataset_train, dataset_test)

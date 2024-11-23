@@ -8,8 +8,7 @@ from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
-from model.BERT_like import RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss
-from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForM6ACls, DNABERT2ForSeqCls
+from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForSeqCls, DNABERT2ForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss
 import model.DeepM6ASeq
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -119,9 +118,9 @@ class M6APredMetrics(BaseMetrics):
 
 class M6APredCollator(SeqClsCollator):
     def __init__(self, max_seq_len, tokenizer, label2id,
-                 replace_T=True, replace_U=False, use_kmer=True):
+                 replace_T=True, replace_U=False, use_kmer=1,pad_token_id=0):
         super(M6APredCollator, self).__init__(max_seq_len, tokenizer, label2id,
-                                              replace_T, replace_U, use_kmer)
+                                              replace_T, replace_U, use_kmer,pad_token_id)
 
 
 class M6APredTrainer(SeqClsTrainer):
@@ -151,7 +150,11 @@ class M6APredEvaluator():
         self._loss_fn = M6ALoss().to(self.device)
         self._collate_fn = M6APredCollator(
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
-            label2id=LABEL2ID, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+            label2id=LABEL2ID, 
+            replace_T=args.replace_T, 
+            replace_U=args.replace_U, 
+            use_kmer=args.use_kmer,
+            pad_token_id=args.pad_token_id)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
         self._metric = M6APredMetrics(metrics=args.metrics,
                                       save_path=f'{args.output_dir}/{args.method}')
@@ -207,7 +210,7 @@ class RNABertEvaluator(M6APredEvaluator):
         # ========== Build tokenizer, model, criterion
         model_config = get_config(args.model_config)
         self.model = BertModel(model_config)
-        self.model = RNABertForM6ACls(self.model, class_num=2)
+        self.model = RNABertForSeqCls(self.model, class_num=2)
         if args.model_path:
             self.model._load_pretrained_bert(args.model_path)
         else:

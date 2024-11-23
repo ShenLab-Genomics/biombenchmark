@@ -10,16 +10,17 @@ from model.BERT_like import RNATokenizer
 from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
-from model.BERT_like import SeqClsLoss
 from model.SpTransformer.sptransformer import Ex2
+from model.SpliceAI import spliceai
+from model.Pangolin import pangolin
 from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls, RNAMsmForTokenCls, MAMBAForTokenCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModel
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
 from sklearn.metrics import average_precision_score, roc_auc_score
-from transformers import AutoTokenizer, MambaConfig, MambaModel
 
 
+'''
 class SpliceTokenClsLoss(nn.Module):
     def __init__(self):
         super().__init__()
@@ -56,6 +57,41 @@ class SpliceTokenClsLoss(nn.Module):
         else:
             raise ValueError("Invalid prediction dimension.")
         return loss
+'''
+
+
+class SpliceTokenClsLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, outputs, labels):
+        pred_dim = outputs.shape[1]
+        res = {}
+        if pred_dim == 3:
+            # neither / acceptor / donor
+            # calculate class 1 and 2
+            outputs = outputs[:, :3]
+            labels = labels[:, :3]
+            loss = F.cross_entropy(outputs, labels)
+
+        elif pred_dim == 15 or pred_dim == 53:
+
+            # idx = torch.where((labels[:, 0, :] == 0))
+            # outputs = outputs[:, :, :]
+            # labels = labels[:, 3:, :]
+            # loss = F.binary_cross_entropy_with_logits(
+            #     outputs[:, 3:], labels[:, 3:])
+            loss = F.binary_cross_entropy_with_logits(
+                outputs[:, :], labels[:, 3:])
+            # loss = F.binary_cross_entropy_with_logits(
+            #     outputs[idx[0], :, idx[1]], labels[idx[0], :, idx[1]])
+
+            assert torch.isnan(labels).sum() == 0, "Labels is NaN."
+            # loss = loss1 + loss2
+            assert torch.isnan(loss).sum() == 0, "Loss is NaN."
+        else:
+            raise ValueError("Invalid prediction dimension.")
+        return loss
 
 
 class SpliceMetrics(BaseMetrics):
@@ -75,27 +111,15 @@ class SpliceMetrics(BaseMetrics):
             # neither / acceptor / donor
             # calculate class 1 and 2
             outputs = torch.softmax(outputs, dim=1)[:, 1:]
-            labels = labels[:, 1:]
+            labels = labels[:, 1:3]
 
-        elif pred_dim == 18 or pred_dim == 56:
-
-            if pred_dim == 18:
-                # 3 classes and 15 tissues
-                # calculate 15 tissues separately
-                outputs = torch.sigmoid(outputs[:, 3:])
-                labels = labels[:, 3:]
-                pass
-
-            if pred_dim == 56:
-                # 3 classes and 51 tissues
-                # calculate 51 tissues separately
-                outputs = torch.sigmoid(outputs[:, 3:])
-                labels = labels[:, 3:]
-                pass
+        elif pred_dim == 15 or pred_dim == 53:
+            # calculate 15 tissues separately
+            outputs = torch.sigmoid(outputs[:, :])
+            labels = labels[:, 3:]
 
         else:
             raise ValueError("Invalid prediction dimension.")
-
         for name in self.metrics:
             func = getattr(self, name)
             if func:
@@ -282,10 +306,11 @@ class SpliceTokenCollator(BaseCollator):
                 seq = seq[start-self.overflow:start +
                           self.max_seq_len+self.overflow]
                 seq = seq2kmer(seq)
+                input_text = "[CLS]" + seq
             else:
                 seq = seq[start:start+self.max_seq_len]
+                input_text = seq
 
-            input_text = "[CLS]" + seq
             # print(input_text)
             input_ids = self.tokenizer(input_text)["input_ids"]
             # print(input_ids)
@@ -457,12 +482,24 @@ class RNAMSMEvaluator(SpliceEvaluator):
 class RNAErnieEvaluator(SpliceEvaluator):
     def __init__(self, args, tokenizer=None) -> None:
         super().__init__(args, tokenizer)
+        self.model = AutoModelForTokenClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num)
+        self.model = RNAErnieForTokenCls(
+            self.model, num_labels=args.class_num).to(self.device)
+        self.mode = 'token'
+
+
+class RNAErnieRawEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer=None) -> None:
+        from multimolecule import RnaTokenizer, RnaErnieForNucleotidePrediction, RnaErnieModel, RnaErnieConfig, HeadConfig
+        tokenizer = RnaTokenizer.from_pretrained(args.model_path)
+        super().__init__(args, tokenizer)
         # self.model = AutoModelForTokenClassification.from_pretrained(
         #     args.model_path, num_labels=args.class_num
         # )
-        self.model = AutoModel.from_pretrained(
-            args.model_path
-        )
+        config = RnaErnieConfig(num_labels=args.class_num)
+        self.model = RnaErnieForNucleotidePrediction(config)
+
         self.model = RNAErnieForTokenCls(
             self.model, num_labels=args.class_num).to(self.device)
         self.mode = 'token'
@@ -475,27 +512,93 @@ class SpTransformerEvaluator(SpliceEvaluator):
         tissue_num = args.class_num
         save_dict = torch.load(
             args.model_path, map_location='cpu')
+        for k in list(save_dict["state_dict"].keys()):
+            if "encoder." not in k:
+                save_dict["state_dict"].pop(k)
+            if ".tissue_output.weight" in k:
+                save_dict["state_dict"].pop(k)
+            if ".tissue_output.bias" in k:
+                save_dict["state_dict"].pop(k)
         if tissue_num == 18:
             tissue_num = 15
         elif tissue_num == 3:
-            save_dict["state_dict"].pop("usage.weight")
-            save_dict["state_dict"].pop("usage.bias")
             tissue_num = 0
         elif tissue_num == 56:
-            # save_dict["state_dict"].pop()
-            # save_dict["state_dict"].pop("usage.weight")
-            # save_dict["state_dict"].pop("usage.bias")
-            for k in list(save_dict["state_dict"].keys()):
-                if "encoder." not in k:
-                    save_dict["state_dict"].pop(k)
             tissue_num = 53
-        self.model = Ex2(128, context_len=4250, tissue_num=tissue_num,
+        if int(args.max_seq_len) == 512:
+            context_len = 6
+        else:
+            context_len = 4250
+        self.model = Ex2(128, context_len=context_len, tissue_num=tissue_num,
                          max_seq_len=8192, attn_depth=8, training=False)
 
         self.model.load_state_dict(save_dict["state_dict"], strict=False)
         self.model.to(self.device)
         self.mode = 'onehot'
 
+
+class RawSpTransformerEvaluator(SpliceEvaluator):
+
+    def __init__(self, args) -> None:
+        super().__init__(args, tokenizer=None)
+        tissue_num = args.class_num
+        if tissue_num == 18:
+            tissue_num = 15
+        elif tissue_num == 3:
+            tissue_num = 0
+        elif tissue_num == 56:
+            tissue_num = 53
+        if int(args.max_seq_len) == 512:
+            context_len = 6
+        else:
+            context_len = 4250
+        self.model = Ex2(128, context_len=context_len, tissue_num=tissue_num,
+                         max_seq_len=8192, attn_depth=8, training=False)
+        self.model.to(self.device)
+        self.mode = 'onehot'
+
+
+class SpliceAIEvaluator(SpliceEvaluator):
+    def __init__(self, args) -> None:
+        super().__init__(args, tokenizer=None)
+        self.model = spliceai.SpliceAI(
+            spliceai.L, spliceai.W, spliceai.AR, num_class=args.class_num).to(self.device)
+        self.mode = 'onehot'
+
+class SpliceAIShortEvaluator(SpliceEvaluator):
+    def __init__(self, args) -> None:
+        super().__init__(args, tokenizer=None)
+        self.model = spliceai.SpliceAI(
+            spliceai.L, spliceai.W, spliceai.AR, num_class=args.class_num,CL=12).to(self.device)
+        self.mode = 'onehot'
+
+
+class PangolinEvaluator(SpliceEvaluator):
+    def __init__(self, args) -> None:
+        super().__init__(args, tokenizer=None)
+        self.model = pangolin.PangolinForSplice(tissue_num=args.class_num).to(self.device)
+        self.mode = 'onehot'
+
+    def run(self, args, train_data, eval_data):
+        self.buildTrainer(args)
+        args.device = self.device
+        self.token_cls_trainer = SpliceTrainer(
+            args=args,
+            model=self.model,
+            train_dataset=train_data,
+            eval_dataset=eval_data,
+            data_collator=self._collate_fn,
+            loss_fn=self._loss_fn,
+            optimizer=self._optimizer,
+            compute_metrics=self._metric,
+        )
+        for i_epoch in range(args.num_train_epochs):
+            # Do not retrain
+            print("Epoch: {}".format(i_epoch))
+            self.token_cls_trainer.eval(i_epoch)
+            break
+
+        
 
 '''
 class RNAMAMBAEvaluator(SpliceEvaluator):

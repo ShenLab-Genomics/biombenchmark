@@ -8,8 +8,7 @@ from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
-from model.BERT_like import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss
-from model.wrap_for_cls import DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls
+from model.wrap_for_cls import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss, DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
@@ -125,6 +124,14 @@ class SeqClsMetrics(BaseMetrics):
         prauc = auc(recall, precision)
         return prauc, precision, recall
 
+    def emb(self, pred, labels, epoch=0):
+        fsave = os.path.join(
+            self.save_path, f'epoch_{epoch}_emb_pred')
+        np.save(fsave, pred)
+        fsave = os.path.join(
+            self.save_path, f'epoch_{epoch}_emb_labels')
+        np.save(fsave, labels)
+
 
 def seq2kmer(seq, kmer=1):
     kmer_text = ""
@@ -138,7 +145,7 @@ def seq2kmer(seq, kmer=1):
 
 class SeqClsCollator(BaseCollator):
     def __init__(self, max_seq_len, tokenizer, label2id,
-                 replace_T=True, replace_U=False, use_kmer=True):
+                 replace_T=True, replace_U=False, use_kmer=1,pad_token_id=0):
 
         super(SeqClsCollator, self).__init__()
         self.max_seq_len = max_seq_len
@@ -149,6 +156,7 @@ class SeqClsCollator(BaseCollator):
         self.replace_T = replace_T
         self.replace_U = replace_U
         self.use_kmer = use_kmer
+        self.pad_token_id = pad_token_id
 
     def __call__(self, raw_data_b):
         # print('raw:', raw_data_b)
@@ -166,7 +174,9 @@ class SeqClsCollator(BaseCollator):
                 kmer_text = seq
                 input_text = kmer_text
             # input_text = "[CLS] " + kmer_text + " [SEP]"
+            # print(input_text)
             input_ids = self.tokenizer(input_text)["input_ids"]
+            # exit()
             if None in input_ids:
                 # replace all None with 0
                 input_ids = [0 if x is None else x for x in input_ids]
@@ -186,12 +196,10 @@ class SeqClsCollator(BaseCollator):
             label = label_b[i_batch]
 
             if len(input_ids) > self.max_seq_len:
-                # move [SEP] to end
-                # input_ids[self.max_seq_len-1] = input_ids[-1]
-                input_ids = input_ids[:self.max_seq_len]
+                input_ids = input_ids[:self.max_seq_len] # truncate
 
             if len(input_ids) < self.max_seq_len:
-                input_ids += [0] * (self.max_seq_len - len(input_ids))
+                input_ids += [self.pad_token_id] * (self.max_seq_len - len(input_ids))
             input_ids_stack.append(input_ids)
             labels_stack.append(label)
 
@@ -277,6 +285,33 @@ class SeqClsTrainer(BaseTrainer):
         time_ed = time.time() - time_st
         print(log.format(**results), "; Time: {:.4f}s".format(time_ed))
 
+    def extract_embedding(self, epoch):
+        self.model.eval()
+        time_st = time.time()
+        num_total = 0
+        with tqdm(total=len(self.eval_dataset)) as pbar:
+            outputs_dataset, labels_dataset = [], []
+            for i, data in enumerate(self.eval_dataloader):
+                input_ids = data["input_ids"].to(self.args.device)
+                labels = data["labels"].to(self.args.device)
+
+                with torch.no_grad():
+                    logits = self.model(input_ids, return_embedding=True)
+
+                num_total += self.args.batch_size
+                outputs_dataset.append(logits.cpu().detach())
+                labels_dataset.append(labels.cpu().detach())
+
+                if num_total >= self.args.logging_steps:
+                    pbar.update(num_total)
+                    num_total = 0
+
+        outputs_dataset = torch.concat(outputs_dataset, axis=0)
+        labels_dataset = torch.concat(labels_dataset, axis=0)
+
+        # save emb
+        self.compute_metrics.emb(outputs_dataset, labels_dataset, epoch)
+
 
 class SeqClsEvaluator:
     """
@@ -294,7 +329,11 @@ class SeqClsEvaluator:
         self._loss_fn = SeqClsLoss().to(self.device)
         self._collate_fn = SeqClsCollator(
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
-            label2id=LABEL2ID['nRC'], replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+            label2id=LABEL2ID['nRC'], 
+            replace_T=args.replace_T, 
+            replace_U=args.replace_U, 
+            use_kmer=args.use_kmer,
+            pad_token_id=args.pad_token_id)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
         self._metric = SeqClsMetrics(metrics=args.metrics,
                                      save_path=f'{args.output_dir}/{args.method}')
@@ -321,6 +360,8 @@ class SeqClsEvaluator:
         )
 
         for i_epoch in range(args.num_train_epochs):
+            if args.extract_emb:
+                seq_cls_trainer.extract_embedding(i_epoch)
             print("Epoch: {}".format(i_epoch))
             seq_cls_trainer.train(i_epoch)
             seq_cls_trainer.eval(i_epoch)
@@ -379,8 +420,7 @@ class RNAErnieEvaluator(SeqClsEvaluator):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=args.class_num
         )
-        self.model = RNAErnieForSeqCls(
-            self.model).to(self.device)
+        self.model = RNAErnieForSeqCls(self.model).to(self.device)
 
 
 class DNABERT2Evaluator(SeqClsEvaluator):
