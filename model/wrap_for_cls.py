@@ -86,7 +86,7 @@ class DNABERT2ForSeqCls(nn.Module):
 
     def forward(self, input_ids):
         # DNABERT2 use 3 as pad token
-        logits = self.model(input_ids, attention_mask=input_ids !=3).logits
+        logits = self.model(input_ids, attention_mask=input_ids != 3).logits
         return logits
 
 
@@ -99,3 +99,14 @@ class SeqClsLoss(nn.Module):
         # convert labels to int64
         loss = F.cross_entropy(outputs, labels)
         return loss
+
+
+class NTForSeqCls(nn.Module):
+
+    def __init__(self, model):
+        super(NTForSeqCls, self).__init__()
+        self.model = model
+
+    def forward(self, input_ids):
+        logits = self.model(input_ids, attention_mask=input_ids > 1).logits
+        return logits

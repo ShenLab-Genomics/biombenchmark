@@ -6,18 +6,22 @@ from model.BERT_like import RNATokenizer
 from model.RNAErnie.tokenization_rnaernie import RNAErnieTokenizer
 import torch
 
-MAX_SEQ_LEN = {"RNAMSM": 512,
-               "RNAFM": 512,
-               'DNABERT': 512,
-               "SpliceBERT": 510,
-               'RNAMSM': 512,
-               "RNAErnie": 510,
-               "SpTransformer": 9000,
-               "SpliceAI": 9000,
-               "Pangolin": 9000,
-               "SpTransformer_raw": 9000,
-               "SpTransformer_short": 512,
-               }
+MAX_SEQ_LEN = {
+    "RNABERT": 512,  # adapt
+    "RNAMSM": 512,
+    "RNAFM": 512,
+    'DNABERT': 512,
+    "SpliceBERT": 510,
+    'RNAMSM': 512,
+    "RNAErnie": 510,
+    "SpTransformer": 9000,
+    "SpliceAI": 9000,
+    "Pangolin": 9000,
+    "SpTransformer_raw": 9000,
+    "SpTransformer_short": 512,
+    'NucleotideTransformer': 9000,
+    'NT_Short': 510,
+}
 
 
 def str2list(v):
@@ -35,7 +39,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='')
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'SpliceAI', 'SpTransformer', 'RNAErnieRaw', 'SpTransformer_short', 'SpTransformer_raw', 'Pangolin','SpliceAI_short'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'SpliceAI', 'SpTransformer',
+                             'RNAErnieRaw', 'SpTransformer_short', 'SpTransformer_raw', 'Pangolin', 'SpliceAI_short',
+                             'NucleotideTransformer',
+                             'NT_Short', 'RNABERT'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -170,4 +177,33 @@ if __name__ == '__main__':
         args.replace_U = True
 
         ev = splice_evaluator.PangolinEvaluator(args)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'NucleotideTransformer':
+        args.max_seq_len = MAX_SEQ_LEN["NucleotideTransformer"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+        ev = splice_evaluator.NTEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'NT_Short':
+        args.max_seq_len = MAX_SEQ_LEN["NT_Short"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+        ev = splice_evaluator.NTShortEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'RNABERT':
+        args.max_seq_len = MAX_SEQ_LEN["RNABERT"]
+        args.replace_T = True
+        args.replace_U = False
+        tokenizer = RNATokenizer(args.vocab_path)
+        ev = splice_evaluator.RNABertEvaluator(
+            args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)

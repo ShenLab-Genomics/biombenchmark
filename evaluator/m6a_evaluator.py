@@ -7,8 +7,9 @@ import model.DeepM6ASeq.model
 from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
+from model.bCNNMethylpred import bcnn
 import model.RNAFM.fm as fm
-from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForSeqCls, DNABERT2ForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss
+from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForSeqCls, DNABERT2ForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss,NTForSeqCls
 import model.DeepM6ASeq
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -46,7 +47,6 @@ class M6APredMetrics(BaseMetrics):
         Returns:
             metrics in dict
         """
-
         # preds = 1 / (1+np.exp(-preds))  # sigmoid
         labels = labels.cpu().numpy().astype('int32')
         # pred_score = torch.log_softmax(
@@ -118,9 +118,9 @@ class M6APredMetrics(BaseMetrics):
 
 class M6APredCollator(SeqClsCollator):
     def __init__(self, max_seq_len, tokenizer, label2id,
-                 replace_T=True, replace_U=False, use_kmer=1,pad_token_id=0):
+                 replace_T=True, replace_U=False, use_kmer=1, pad_token_id=0):
         super(M6APredCollator, self).__init__(max_seq_len, tokenizer, label2id,
-                                              replace_T, replace_U, use_kmer,pad_token_id)
+                                              replace_T, replace_U, use_kmer, pad_token_id)
 
 
 class M6APredTrainer(SeqClsTrainer):
@@ -150,9 +150,9 @@ class M6APredEvaluator():
         self._loss_fn = M6ALoss().to(self.device)
         self._collate_fn = M6APredCollator(
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
-            label2id=LABEL2ID, 
-            replace_T=args.replace_T, 
-            replace_U=args.replace_U, 
+            label2id=LABEL2ID,
+            replace_T=args.replace_T,
+            replace_U=args.replace_U,
             use_kmer=args.use_kmer,
             pad_token_id=args.pad_token_id)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
@@ -273,3 +273,104 @@ class DeepM6ASeqEvaluator(M6APredEvaluator):
         super().__init__(tokenizer=one_hot_embed)
         self.model = model.DeepM6ASeq.model.ConvNet_BiLSTM(
             output_dim=2, args=args, wordvec_len=4).to(self.device)
+
+
+class bCNNCollator(BaseCollator):
+    def __init__(self):
+        super(bCNNCollator, self).__init__()
+
+    def dataProcessing(self, seq, key):
+        #################### 2222222222222222222222222222222  ############################
+        bases2 = ['AA', 'AC', 'AG', 'AT', 'CA', 'CC', 'CG',
+                  'CT', 'GA', 'GC', 'GG', 'GT', 'TA', 'TC', 'TG', 'TT']
+        X_2 = np.zeros((len(seq), len(seq[0]), 16))
+        for l, s in enumerate(seq):
+            s2 = s+s[0]
+            res = list(zip(s2, s2[1:]))
+            for i, char in enumerate(res):
+                char = [i[0] for i in char][0] + [i[0] for i in char][1]
+                if char in bases2:
+                    X_2[l, i, bases2.index(char)] = 1
+                else:
+                    print('NO')
+        #################### 2222222222222222222222222222222  ############################
+        bases = ['A', 'C', 'G', 'T']
+        X = np.zeros((len(seq), len(seq[0]), len(bases)))
+        for l, s in enumerate(seq):
+            for i, char in enumerate(s):
+                if char in bases:
+                    X[l, i, bases.index(char)] = 1
+        chem_bases = {'A': [1, 1, 1], 'C': [0, 1, 0],
+                      'G': [1, 0, 0, ], 'T': [0, 0, 1]}
+        Z = np.zeros((len(seq), len(seq[0]), 3))
+        for l, s in enumerate(seq):
+            for i, char in enumerate(s):
+                if char in chem_bases:
+                    Z[l][i] = (chem_bases[char])
+
+        all_features = np.concatenate([X, Z, X_2], axis=2)
+        if key == 1:
+            lbs = list(np.ones(len(X)))
+        if key == 2:
+            lbs = list(np.zeros(len(X)))
+        y = np.array(lbs, dtype=np.int32)
+
+        return all_features, y
+
+    def __call__(self, raw_data_b):
+        seqs = []
+        labels = []
+        for raw_data in raw_data_b:
+            seq = raw_data["seq"]
+            label = raw_data["label"]
+            seq = seq.upper()
+            seq = seq.replace("U", "T")
+
+            seqs.append(seq)
+            labels.append(label)
+
+        features, _ = self.dataProcessing(seqs, 1)
+        labels = np.array(labels, dtype=np.int32)
+
+        return {
+            "input_ids": torch.from_numpy(features).float(),
+            "labels": torch.from_numpy(labels).long()}
+
+
+class bCNNEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        self.model = bcnn.bCNN().to(self.device)
+
+    def buildTrainer(self, args):
+        self._loss_fn = M6ALoss().to(self.device)
+        self._collate_fn = bCNNCollator()
+        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        self._metric = M6APredMetrics(metrics=args.metrics,
+                                      save_path=f'{args.output_dir}/{args.method}')
+
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+
+
+class NTEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        from peft import LoraConfig, TaskType, get_peft_model
+        super().__init__(tokenizer=tokenizer)
+
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_path, num_labels=2, trust_remote_code=True,
+        )
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+
+        peft_config = LoraConfig(
+            task_type=TaskType.SEQ_CLS, inference_mode=False, r=1, lora_alpha=32, lora_dropout=0.1,
+            target_modules=["query", "value"]
+        )
+        self.model = get_peft_model(self.model, peft_config)
+        self.model = NTForSeqCls(self.model).to(self.device)

@@ -8,7 +8,7 @@ from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
-from model.wrap_for_cls import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss, DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls
+from model.wrap_for_cls import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss, DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls, NTForSeqCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
@@ -145,7 +145,7 @@ def seq2kmer(seq, kmer=1):
 
 class SeqClsCollator(BaseCollator):
     def __init__(self, max_seq_len, tokenizer, label2id,
-                 replace_T=True, replace_U=False, use_kmer=1,pad_token_id=0):
+                 replace_T=True, replace_U=False, use_kmer=1, pad_token_id=0):
 
         super(SeqClsCollator, self).__init__()
         self.max_seq_len = max_seq_len
@@ -196,10 +196,11 @@ class SeqClsCollator(BaseCollator):
             label = label_b[i_batch]
 
             if len(input_ids) > self.max_seq_len:
-                input_ids = input_ids[:self.max_seq_len] # truncate
+                input_ids = input_ids[:self.max_seq_len]  # truncate
 
             if len(input_ids) < self.max_seq_len:
-                input_ids += [self.pad_token_id] * (self.max_seq_len - len(input_ids))
+                input_ids += [self.pad_token_id] * \
+                    (self.max_seq_len - len(input_ids))
             input_ids_stack.append(input_ids)
             labels_stack.append(label)
 
@@ -329,9 +330,9 @@ class SeqClsEvaluator:
         self._loss_fn = SeqClsLoss().to(self.device)
         self._collate_fn = SeqClsCollator(
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
-            label2id=LABEL2ID['nRC'], 
-            replace_T=args.replace_T, 
-            replace_U=args.replace_U, 
+            label2id=LABEL2ID['nRC'],
+            replace_T=args.replace_T,
+            replace_U=args.replace_U,
             use_kmer=args.use_kmer,
             pad_token_id=args.pad_token_id)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
@@ -431,3 +432,26 @@ class DNABERT2Evaluator(SeqClsEvaluator):
             args.model_path, num_labels=args.class_num, trust_remote_code=True,
         )
         self.model = DNABERT2ForSeqCls(self.model).to(self.device)
+
+
+class NTEvaluator(SeqClsEvaluator):
+    def __init__(self, args, tokenizer=None):
+        from peft import LoraConfig, TaskType, get_peft_model
+        super().__init__(tokenizer)
+
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num, trust_remote_code=True,
+        )
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+
+        peft_config = LoraConfig(
+            task_type=TaskType.SEQ_CLS, inference_mode=False, r=1, lora_alpha=32, lora_dropout=0.1,
+            target_modules=["query", "value"]
+        )
+        self.model = get_peft_model(self.model, peft_config)
+        self.model.print_trainable_parameters()
+        self.model = NTForSeqCls(self.model).to(self.device)
+        print(self.model)

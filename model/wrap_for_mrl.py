@@ -181,7 +181,7 @@ class RNABERTForReg(nn.Module):
     def forward(self, input_ids):
         with torch.no_grad():
             encoded_layers, pooled_output = self.bert(
-                input_ids, output_all_encoded_layers=False)
+                input_ids, attention_mask=input_ids > 0, output_all_encoded_layers=False)
         logits = self.predictor(encoded_layers.transpose(
             1, 2)).squeeze(-1)
         return logits
@@ -199,7 +199,7 @@ class DNABERTForReg(nn.Module):
         with torch.no_grad():
             # logits = self.model(input_ids, attention_mask=input_ids > 0)[
             #     'last_hidden_state']
-            logits = self.model(input_ids)[
+            logits = self.model(input_ids,  attention_mask=input_ids > 0)[
                 'last_hidden_state']
         logits = self.predictor(logits.transpose(
             1, 2)).squeeze(-1)
@@ -217,7 +217,24 @@ class DNABERT2ForReg(nn.Module):
         with torch.no_grad():
             # logits = self.model(input_ids)[
             #     'last_hidden_state']
-            logits = self.model(input_ids, attention_mask=input_ids > 0)[0]
+            logits = self.model(input_ids, attention_mask=input_ids != 3)[0]
+        logits = self.predictor(logits.transpose(
+            1, 2)).squeeze(-1)
+        return logits
+
+
+class NTForReg(nn.Module):
+    def __init__(self, model):
+        super(NTForReg, self).__init__()
+        self.predictor = create_1dcnn_for_emd(1024, 1)
+        self.model = model
+
+    def forward(self, input_ids):
+        input_ids = input_ids[:, 1:]
+        with torch.no_grad():
+            torch_outs = self.model(
+                input_ids, attention_mask=input_ids > 1, output_hidden_states=True)
+            logits = torch_outs['hidden_states'][-1]
         logits = self.predictor(logits.transpose(
             1, 2)).squeeze(-1)
         return logits
@@ -243,25 +260,6 @@ class PureReg(nn.Module):
         logits = self.predictor(one_hot_tokens.permute(0, 2, 1))[:, 0]
         # print(logits.shape)
         return logits
-
-
-class UTRLMForReg(nn.Module):
-    def __init__(self, backbone):
-        super(UTRLMForReg, self).__init__()
-
-        self.model = backbone
-        self.predictor = create_1dcnn_for_emd(128, 1)
-
-    def forward(self, input_ids):
-        with torch.no_grad():
-            logits = self.model(input_ids, attention_mask=input_ids > 0)[
-                'last_hidden_state']
-        # logits = self.model(x)[
-        #     'last_hidden_state']
-        logits = self.predictor(logits.transpose(
-            1, 2)).squeeze(-1)
-        return logits
-
 
 class Optimus(nn.Module):
     def __init__(self, inp_len=50, nodes=40, layers=3, filter_len=8, nbr_filters=120,

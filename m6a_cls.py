@@ -13,7 +13,9 @@ MAX_SEQ_LEN = {"RNABERT": 440,
                'DNABERT2': 512,
                "SpliceBERT": 512,
                "RNAErnie": 512,
-               "DeepM6A": 101
+               "DeepM6A": 101,
+               "bCNNMethylpred": 101,
+               'NucleotideTransformer': 100
                }
 
 
@@ -33,7 +35,7 @@ if __name__ == '__main__':
         description='')
 
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'DeepM6A', 'RNABERT'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'DeepM6A', 'RNABERT', 'bCNNMethylpred', 'NucleotideTransformer'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -55,17 +57,18 @@ if __name__ == '__main__':
 
     assert args.output_dir, "output_dir is required."
 
-
     ###
     seed = 2024
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     ###
 
-
     # Special case
-    if ('101bp' in args.dataset_train) and (MAX_SEQ_LEN[args.method]>103):
+    if ('101bp' in args.dataset_train) and (MAX_SEQ_LEN[args.method] > 103):
         MAX_SEQ_LEN[args.method] = 103
+
+    if ('101bp' in args.dataset_train) and (args.method=='NucleotideTransformer'):
+        MAX_SEQ_LEN[args.method] = 25
     ##
 
     dataset_train = m6a_dataset.M6ADataset(
@@ -139,4 +142,23 @@ if __name__ == '__main__':
         args.max_seq_len = MAX_SEQ_LEN[args.method]
 
         ev = m6a_evaluator.DeepM6ASeqEvaluator(args, tokenizer=None)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'bCNNMethylpred':
+        args.replace_T = False
+        args.replace_U = True
+        args.max_seq_len = MAX_SEQ_LEN[args.method]
+
+        ev = m6a_evaluator.bCNNEvaluator(args, tokenizer=None)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'NucleotideTransformer':
+        args.max_seq_len = MAX_SEQ_LEN["NucleotideTransformer"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = m6a_evaluator.NTEvaluator(
+            args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)

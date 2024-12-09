@@ -13,9 +13,9 @@ from evaluator.base_evaluator import BaseMetrics
 from evaluator.seq_cls_evaluator import SeqClsTrainer, SeqClsCollator, SeqClsEvaluator, seq2kmer
 import model.RNAFM.fm as fm
 from model.wrap_for_cls import DNABERTForSeqCls
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel, AutoModelForMaskedLM
 from torch.optim import AdamW
-from model.wrap_for_mrl import RNAFmForReg, RNAErnieForReg, PureReg, UTRLMForReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus
+from model.wrap_for_mrl import RNAFmForReg, RNAErnieForReg, PureReg, UTRLMForReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus, NTForReg
 from model.UTRlm import utrlm
 import scipy.stats as stats
 from sklearn import preprocessing
@@ -282,6 +282,26 @@ class DNABERT2Evaluator(MRLEvaluator):
         self.model = DNABERT2ForReg(self.model).to(self.device)
 
 
+class NTEvaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer=None):
+        from peft import LoraConfig, TaskType, get_peft_model
+        super().__init__(tokenizer)
+        self.model = AutoModelForMaskedLM.from_pretrained(
+            args.model_path, trust_remote_code=True)
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+
+        peft_config = LoraConfig(
+            task_type=TaskType.SEQ_CLS, inference_mode=False, r=1, lora_alpha=32, lora_dropout=0.1,
+            target_modules=["query", "value"]
+        )
+        self.model = get_peft_model(self.model, peft_config)
+        self.model.print_trainable_parameters()
+        self.model = NTForReg(self.model).to(self.device)
+
+
 class RNABertEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
@@ -297,51 +317,6 @@ class ResNetEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
         self.model = PureReg().to(self.device)
-
-
-class UTRLMEvaluator(MRLEvaluator):
-    def __init__(self, args, tokenizer) -> None:
-        from multimolecule import RnaTokenizer, UtrLmForSequencePrediction, UtrLmModel
-        tokenizer = RnaTokenizer.from_pretrained('model/UTRLM')
-        super().__init__(tokenizer=tokenizer)
-        model = UtrLmModel.from_pretrained(
-            'model/UTRLM')
-
-        self.model = UTRLMForReg(model).to(self.device)
-        # self.model = AutoModelForSequenceClassification.from_pretrained(
-        #     args.model_path, num_labels=1).to(self.device)
-        # self.model = DNABERT2ForSeqCls(self.model)
-
-
-class UTRLMoriginalEvaluator(MRLEvaluator):
-    def __init__(self, args, tokenizer) -> None:
-        super().__init__(tokenizer=tokenizer)
-        modelfile = args.model_path
-
-        model = utrlm.CNN_linear()
-        # st.write(model.state_dict().keys())
-        # st.write({k.replace('module.', ''):v for k,v in torch.load(modelfile, map_location=torch.device('cpu')).items()}.keys())
-        model.load_state_dict({k.replace('module.', ''): v for k, v in torch.load(
-            modelfile, map_location=torch.device('cpu')).items()}, strict=True)
-        self.model = model.to(self.device)
-
-    # def run(self, args, train_data, eval_data):
-    #     self.buildTrainer(args)
-    #     args.device = self.device
-    #     self.seq_cls_trainer = MRLTrainer(
-    #         args=args,
-    #         model=self.model,
-    #         train_dataset=train_data,
-    #         eval_dataset=eval_data,
-    #         data_collator=self._collate_fn,
-    #         loss_fn=self._loss_fn,
-    #         optimizer=self._optimizer,
-    #         compute_metrics=self._metric,
-    #     )
-    #     for i_epoch in range(args.num_train_epochs):
-    #         print("Epoch: {}".format(i_epoch))
-    #         self.seq_cls_trainer.eval(i_epoch)
-
 
 class OptimusEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer=None):

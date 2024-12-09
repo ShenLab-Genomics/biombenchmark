@@ -12,7 +12,8 @@ MAX_SEQ_LEN = {"RNABERT": 440,
                'DNABERT': 512,
                'DNABERT2': 512,
                "SpliceBERT": 512,
-               "RNAErnie": 512
+               "RNAErnie": 512,
+               'NucleotideTransformer': 100,  # 6-mers
                }
 
 
@@ -31,7 +32,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='')
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNABERT', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'DNABERT2'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNABERT', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'DNABERT2', 'NucleotideTransformer'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -131,5 +132,16 @@ if __name__ == '__main__':
             args.model_path)
 
         ev = seq_cls_evaluator.DNABERT2Evaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'NucleotideTransformer':
+        args.max_seq_len = MAX_SEQ_LEN["NucleotideTransformer"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = seq_cls_evaluator.NTEvaluator(
             args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)

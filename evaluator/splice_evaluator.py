@@ -13,9 +13,9 @@ from model.RNAMSM.model import MSATransformer
 from model.SpTransformer.sptransformer import Ex2
 from model.SpliceAI import spliceai
 from model.Pangolin import pangolin
-from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls, RNAMsmForTokenCls, MAMBAForTokenCls
+from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls, RNAMsmForTokenCls, MAMBAForTokenCls, NTForTokenCls, NTForTokenClsShort, RNABertForTokenCls
 from torch.optim import AdamW
-from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModel
+from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModel, AutoModelForMaskedLM
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
 from sklearn.metrics import average_precision_score, roc_auc_score
 
@@ -302,7 +302,7 @@ class SpliceTokenCollator(BaseCollator):
                 "T", "U") if self.replace_T else seq.replace("U", "T")
 
             start = (len(seq) - self.max_seq_len)//2
-            if self.use_kmer > 0:
+            if self.use_kmer > 0 or self.use_kmer ==-11:
                 seq = seq[start-self.overflow:start +
                           self.max_seq_len+self.overflow]
                 seq = seq2kmer(seq)
@@ -311,9 +311,13 @@ class SpliceTokenCollator(BaseCollator):
                 seq = seq[start:start+self.max_seq_len]
                 input_text = seq
 
-            # print(input_text)
+            if self.use_kmer == -10:  # a special marker
+                input_text = input_text.replace('N', 'A')
+            if self.use_kmer == -11:
+                input_text = input_text.replace('N','[PAD]')
+                
             input_ids = self.tokenizer(input_text)["input_ids"]
-            # print(input_ids)
+
             input_ids_stack.append(input_ids)
 
             label = data[1]
@@ -505,6 +509,52 @@ class RNAErnieRawEvaluator(SpliceEvaluator):
         self.mode = 'token'
 
 
+class NTEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer=None) -> None:
+        from peft import LoraConfig, TaskType, get_peft_model
+        super().__init__(args, tokenizer=tokenizer)
+
+        self.model = AutoModelForMaskedLM.from_pretrained(
+            args.model_path, trust_remote_code=True)
+
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+
+        peft_config = LoraConfig(
+            task_type=TaskType.TOKEN_CLS, inference_mode=False, r=1, lora_alpha=32, lora_dropout=0.1,
+            target_modules=["query", "value"]
+        )
+        self.model = get_peft_model(self.model, peft_config)
+        self.model = NTForTokenCls(
+            self.model, num_labels=args.class_num).to(self.device)
+        self.mode = 'token'
+
+
+class NTShortEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer=None) -> None:
+        from peft import LoraConfig, TaskType, get_peft_model
+        super().__init__(args, tokenizer=tokenizer)
+
+        self.model = AutoModelForMaskedLM.from_pretrained(
+            args.model_path, trust_remote_code=True)
+
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+
+        peft_config = LoraConfig(
+            task_type=TaskType.TOKEN_CLS, inference_mode=False, r=1, lora_alpha=32, lora_dropout=0.1,
+            target_modules=["query", "value"]
+        )
+        self.model = get_peft_model(self.model, peft_config)
+        self.model = NTForTokenClsShort(
+            self.model, num_labels=args.class_num).to(self.device)
+        self.mode = 'token'
+
+
 class SpTransformerEvaluator(SpliceEvaluator):
 
     def __init__(self, args) -> None:
@@ -565,18 +615,20 @@ class SpliceAIEvaluator(SpliceEvaluator):
             spliceai.L, spliceai.W, spliceai.AR, num_class=args.class_num).to(self.device)
         self.mode = 'onehot'
 
+
 class SpliceAIShortEvaluator(SpliceEvaluator):
     def __init__(self, args) -> None:
         super().__init__(args, tokenizer=None)
         self.model = spliceai.SpliceAI(
-            spliceai.L, spliceai.W, spliceai.AR, num_class=args.class_num,CL=12).to(self.device)
+            spliceai.L, spliceai.W, spliceai.AR, num_class=args.class_num, CL=12).to(self.device)
         self.mode = 'onehot'
 
 
 class PangolinEvaluator(SpliceEvaluator):
     def __init__(self, args) -> None:
         super().__init__(args, tokenizer=None)
-        self.model = pangolin.PangolinForSplice(tissue_num=args.class_num).to(self.device)
+        self.model = pangolin.PangolinForSplice(
+            tissue_num=args.class_num).to(self.device)
         self.mode = 'onehot'
 
     def run(self, args, train_data, eval_data):
@@ -598,7 +650,6 @@ class PangolinEvaluator(SpliceEvaluator):
             self.token_cls_trainer.eval(i_epoch)
             break
 
-        
 
 '''
 class RNAMAMBAEvaluator(SpliceEvaluator):
@@ -617,3 +668,14 @@ class RNAMAMBAEvaluator(SpliceEvaluator):
         self.model = Mamba2Model(config)
         self.model = MAMBAForTokenCls(self.model).to(self.device)
 '''
+
+
+class RNABertEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer=None):
+        super().__init__(args, tokenizer)
+        model_config = get_config(args.model_config)
+        self.model = BertModel(model_config)
+        self.model = RNABertForTokenCls(self.model, num_labels=args.class_num)
+        self.model._load_pretrained_bert(args.model_path)
+        self.model.to(self.device)
+        self.mode = 'token'

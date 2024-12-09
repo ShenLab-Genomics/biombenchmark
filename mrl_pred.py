@@ -16,7 +16,8 @@ MAX_SEQ_LEN = {"RNABERT": 102,
                "DeepM6A": 102,
                "UTRLM": 102,
                "ResNet": 102,
-               'Optimus': 101
+               'Optimus': 101,
+               'NucleotideTransformer': 101,
                }
 
 
@@ -36,7 +37,7 @@ if __name__ == '__main__':
         description='')
 
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'RNABERT', 'UTRLM', 'ResNet', 'Optimus'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'RNABERT', 'UTRLM', 'ResNet', 'Optimus','NucleotideTransformer'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -133,15 +134,6 @@ if __name__ == '__main__':
             args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
 
-    if args.method == 'UTRLM':
-        args.max_seq_len = MAX_SEQ_LEN["UTRLM"]
-        args.replace_T = False
-        args.replace_U = True
-        tokenizer = RNATokenizer(args.vocab_path)
-
-        ev = mrl_evaluator.UTRLMEvaluator(args, tokenizer=None)
-        ev.run(args, dataset_train, dataset_test)
-
     if args.method == 'Optimus':
         args.max_seq_len = MAX_SEQ_LEN["Optimus"]
         args.replace_T = True
@@ -149,4 +141,15 @@ if __name__ == '__main__':
         tokenizer = RNATokenizer(args.vocab_path)
 
         ev = mrl_evaluator.OptimusEvaluator(args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'NucleotideTransformer':
+        args.max_seq_len = MAX_SEQ_LEN["NucleotideTransformer"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = mrl_evaluator.NTEvaluator(
+            args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
