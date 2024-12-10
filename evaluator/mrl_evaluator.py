@@ -15,7 +15,7 @@ import model.RNAFM.fm as fm
 from model.wrap_for_cls import DNABERTForSeqCls
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel, AutoModelForMaskedLM
 from torch.optim import AdamW
-from model.wrap_for_mrl import RNAFmForReg, RNAErnieForReg, PureReg, UTRLMForReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus, NTForReg
+from model.wrap_for_mrl import RNAFmForReg, RNAErnieForReg, PureReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus, NTForReg
 from model.UTRlm import utrlm
 import scipy.stats as stats
 from sklearn import preprocessing

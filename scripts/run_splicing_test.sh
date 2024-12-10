@@ -1,4 +1,0 @@
-#!bash
-
-
-python evaluator.py

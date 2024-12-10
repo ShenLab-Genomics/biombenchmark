@@ -1,0 +1,741 @@
+RNAFM
+vocab: OrderedDict([(0, '[CLS]'), (1, '[PAD]'), (2, '[SEP]'), (3, '[UNK]'), (4, 'A'), (5, 'C'), (6, 'G'), (7, 'U'), (8, 'R'), (9, 'Y'), (10, 'K'), (11, 'M'), (12, 'S'), (13, 'W'), (14, 'B'), (15, 'D'), (16, 'H'), (17, 'V'), (18, 'N'), (19, '-'), (20, 'null_1'), (21, 'null_2'), (22, 'null_3'), (23, 'null_4'), (24, '[MASK]')])
+Trainable parameters: 99529879
+Epoch: 0
+Train	Loss: 0.264678; Time: 185.2310s
+Test	RNAFM	f1s: 0.9321	precision: 0.9355	recall: 0.9331	accuracy: 0.9331	mcc: 0.9278	 ; Time: 25.3444s
+Epoch: 1
+Train	Loss: 0.170526; Time: 181.6791s
+Test	RNAFM	f1s: 0.9518	precision: 0.9531	recall: 0.9515	accuracy: 0.9515	mcc: 0.9476	 ; Time: 25.2380s
+Epoch: 2
+Train	Loss: 0.024743; Time: 181.3293s
+Test	RNAFM	f1s: 0.9669	precision: 0.9671	recall: 0.9669	accuracy: 0.9669	mcc: 0.9642	 ; Time: 25.1954s
+Epoch: 3
+Train	Loss: 0.005078; Time: 181.8669s
+Test	RNAFM	f1s: 0.9734	precision: 0.9736	recall: 0.9735	accuracy: 0.9735	mcc: 0.9713	 ; Time: 25.1879s
+Epoch: 4
+Train	Loss: 0.004672; Time: 181.2916s
+Test	RNAFM	f1s: 0.9719	precision: 0.9722	recall: 0.9719	accuracy: 0.9719	mcc: 0.9696	 ; Time: 25.1063s
+Epoch: 5
+Train	Loss: 0.033172; Time: 181.1596s
+Test	RNAFM	f1s: 0.9676	precision: 0.9686	recall: 0.9677	accuracy: 0.9677	mcc: 0.9651	 ; Time: 25.1612s
+Epoch: 6
+Train	Loss: 0.063607; Time: 181.2440s
+Test	RNAFM	f1s: 0.9646	precision: 0.9650	recall: 0.9646	accuracy: 0.9646	mcc: 0.9617	 ; Time: 25.0882s
+Epoch: 7
+Train	Loss: 0.006138; Time: 181.2050s
+Test	RNAFM	f1s: 0.9523	precision: 0.9553	recall: 0.9527	accuracy: 0.9527	mcc: 0.9490	 ; Time: 25.2216s
+Epoch: 8
+Train	Loss: 0.003932; Time: 181.8413s
+Test	RNAFM	f1s: 0.9668	precision: 0.9673	recall: 0.9669	accuracy: 0.9669	mcc: 0.9642	 ; Time: 25.0917s
+Epoch: 9
+Train	Loss: 0.002329; Time: 181.4341s
+Test	RNAFM	f1s: 0.9647	precision: 0.9656	recall: 0.9646	accuracy: 0.9646	mcc: 0.9617	 ; Time: 25.1349s
+Epoch: 10
+Train	Loss: 0.002953; Time: 181.7183s
+Test	RNAFM	f1s: 0.9661	precision: 0.9677	recall: 0.9662	accuracy: 0.9662	mcc: 0.9635	 ; Time: 25.0689s
+Epoch: 11
+Train	Loss: 0.003976; Time: 180.6760s
+Test	RNAFM	f1s: 0.9689	precision: 0.9693	recall: 0.9688	accuracy: 0.9688	mcc: 0.9663	 ; Time: 25.1790s
+Epoch: 12
+Train	Loss: 0.197952; Time: 182.5415s
+Test	RNAFM	f1s: 0.9663	precision: 0.9678	recall: 0.9662	accuracy: 0.9662	mcc: 0.9635	 ; Time: 25.2618s
+Epoch: 13
+Train	Loss: 0.000561; Time: 181.0134s
+Test	RNAFM	f1s: 0.9681	precision: 0.9687	recall: 0.9681	accuracy: 0.9681	mcc: 0.9655	 ; Time: 25.2330s
+Epoch: 14
+Train	Loss: 0.000629; Time: 181.6990s
+Test	RNAFM	f1s: 0.9723	precision: 0.9724	recall: 0.9723	accuracy: 0.9723	mcc: 0.9700	 ; Time: 25.2804s
+Epoch: 15
+Train	Loss: 0.000235; Time: 181.8661s
+Test	RNAFM	f1s: 0.9727	precision: 0.9728	recall: 0.9727	accuracy: 0.9727	mcc: 0.9704	 ; Time: 24.9798s
+Epoch: 16
+Train	Loss: 0.000213; Time: 180.8896s
+Test	RNAFM	f1s: 0.9731	precision: 0.9731	recall: 0.9731	accuracy: 0.9731	mcc: 0.9708	 ; Time: 25.4365s
+Epoch: 17
+Train	Loss: 0.000259; Time: 181.7273s
+Test	RNAFM	f1s: 0.9738	precision: 0.9739	recall: 0.9738	accuracy: 0.9738	mcc: 0.9717	 ; Time: 25.1062s
+Epoch: 18
+Train	Loss: 0.000234; Time: 182.2131s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.0825s
+Epoch: 19
+Train	Loss: 0.000176; Time: 181.5060s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.2634s
+Epoch: 20
+Train	Loss: 0.000148; Time: 180.8314s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.2447s
+Epoch: 21
+Train	Loss: 0.000175; Time: 181.5041s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.1152s
+Epoch: 22
+Train	Loss: 0.000141; Time: 181.3334s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.1267s
+Epoch: 23
+Train	Loss: 0.000141; Time: 180.7495s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.1014s
+Epoch: 24
+Train	Loss: 0.000125; Time: 181.3402s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.2548s
+Epoch: 25
+Train	Loss: 0.000096; Time: 181.6216s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.1596s
+Epoch: 26
+Train	Loss: 0.000102; Time: 181.1967s
+Test	RNAFM	f1s: 0.9742	precision: 0.9743	recall: 0.9742	accuracy: 0.9742	mcc: 0.9721	 ; Time: 25.2294s
+Epoch: 27
+Train	Loss: 0.000098; Time: 181.3057s
+Test	RNAFM	f1s: 0.9746	precision: 0.9747	recall: 0.9746	accuracy: 0.9746	mcc: 0.9725	 ; Time: 25.3180s
+Epoch: 28
+Train	Loss: 0.000098; Time: 181.3222s
+Test	RNAFM	f1s: 0.9746	precision: 0.9747	recall: 0.9746	accuracy: 0.9746	mcc: 0.9725	 ; Time: 25.2830s
+Epoch: 29
+Train	Loss: 0.000073; Time: 180.9776s
+Test	RNAFM	f1s: 0.9746	precision: 0.9747	recall: 0.9746	accuracy: 0.9746	mcc: 0.9725	 ; Time: 25.0302s
+RNAMSM
+vocab: OrderedDict([(0, '[CLS]'), (1, '[PAD]'), (2, '[SEP]'), (3, '[UNK] '), (4, 'A'), (5, 'G'), (6, 'C'), (7, 'U'), (8, 'X'), (9, 'N'), (10, '-'), (11, '[MASK]')])
+model/configs/RNAMSM.json
+Trainable parameters: 95921177
+Epoch: 0
+Train	Loss: 1.732179; Time: 140.5018s
+Test	RNAMSM	f1s: 0.5017	precision: 0.5348	recall: 0.5477	accuracy: 0.5477	mcc: 0.5163	 ; Time: 19.5229s
+Epoch: 1
+Train	Loss: 1.228383; Time: 140.7323s
+Test	RNAMSM	f1s: 0.6098	precision: 0.6524	recall: 0.6292	accuracy: 0.6292	mcc: 0.6023	 ; Time: 19.5567s
+Epoch: 2
+Train	Loss: 1.488136; Time: 141.2318s
+Test	RNAMSM	f1s: 0.6497	precision: 0.6962	recall: 0.6700	accuracy: 0.6700	mcc: 0.6480	 ; Time: 19.6151s
+Epoch: 3
+Train	Loss: 1.042924; Time: 141.1280s
+Test	RNAMSM	f1s: 0.7373	precision: 0.7594	recall: 0.7431	accuracy: 0.7431	mcc: 0.7243	 ; Time: 19.6003s
+Epoch: 4
+Train	Loss: 0.645854; Time: 141.1010s
+Test	RNAMSM	f1s: 0.7819	precision: 0.8007	recall: 0.7850	accuracy: 0.7850	mcc: 0.7688	 ; Time: 19.6148s
+Epoch: 5
+Train	Loss: 0.546270; Time: 141.7749s
+Test	RNAMSM	f1s: 0.8015	precision: 0.8166	recall: 0.8038	accuracy: 0.8038	mcc: 0.7891	 ; Time: 19.6224s
+Epoch: 6
+Train	Loss: 0.478081; Time: 140.4373s
+Test	RNAMSM	f1s: 0.7981	precision: 0.8274	recall: 0.8050	accuracy: 0.8050	mcc: 0.7914	 ; Time: 19.5932s
+Epoch: 7
+Train	Loss: 0.461957; Time: 141.1587s
+Test	RNAMSM	f1s: 0.8674	precision: 0.8702	recall: 0.8681	accuracy: 0.8681	mcc: 0.8574	 ; Time: 19.4124s
+Epoch: 8
+Train	Loss: 0.205375; Time: 141.5292s
+Test	RNAMSM	f1s: 0.8705	precision: 0.8773	recall: 0.8723	accuracy: 0.8723	mcc: 0.8624	 ; Time: 19.4354s
+Epoch: 9
+Train	Loss: 0.429872; Time: 141.0808s
+Test	RNAMSM	f1s: 0.8795	precision: 0.8852	recall: 0.8792	accuracy: 0.8792	mcc: 0.8696	 ; Time: 19.5413s
+Epoch: 10
+Train	Loss: 0.222170; Time: 141.2733s
+Test	RNAMSM	f1s: 0.8888	precision: 0.8928	recall: 0.8892	accuracy: 0.8892	mcc: 0.8803	 ; Time: 19.5461s
+Epoch: 11
+Train	Loss: 0.402947; Time: 141.0626s
+Test	RNAMSM	f1s: 0.8969	precision: 0.8992	recall: 0.8988	accuracy: 0.8988	mcc: 0.8908	 ; Time: 19.4727s
+Epoch: 12
+Train	Loss: 0.382904; Time: 140.4433s
+Test	RNAMSM	f1s: 0.9010	precision: 0.9051	recall: 0.9004	accuracy: 0.9004	mcc: 0.8924	 ; Time: 19.6434s
+Epoch: 13
+Train	Loss: 0.202327; Time: 141.2191s
+Test	RNAMSM	f1s: 0.8897	precision: 0.8959	recall: 0.8900	accuracy: 0.8900	mcc: 0.8814	 ; Time: 19.5189s
+Epoch: 14
+Train	Loss: 0.030889; Time: 141.0103s
+Test	RNAMSM	f1s: 0.9023	precision: 0.9057	recall: 0.9023	accuracy: 0.9023	mcc: 0.8945	 ; Time: 19.5511s
+Epoch: 15
+Train	Loss: 0.172315; Time: 141.1549s
+Test	RNAMSM	f1s: 0.9124	precision: 0.9152	recall: 0.9135	accuracy: 0.9135	mcc: 0.9066	 ; Time: 19.5692s
+Epoch: 16
+Train	Loss: 0.126792; Time: 141.0795s
+Test	RNAMSM	f1s: 0.8838	precision: 0.8959	recall: 0.8858	accuracy: 0.8858	mcc: 0.8777	 ; Time: 19.2881s
+Epoch: 17
+Train	Loss: 0.261564; Time: 141.0452s
+Test	RNAMSM	f1s: 0.9207	precision: 0.9217	recall: 0.9208	accuracy: 0.9208	mcc: 0.9143	 ; Time: 19.7085s
+Epoch: 18
+Train	Loss: 0.187626; Time: 141.8004s
+Test	RNAMSM	f1s: 0.9143	precision: 0.9169	recall: 0.9146	accuracy: 0.9146	mcc: 0.9077	 ; Time: 19.3192s
+Epoch: 19
+Train	Loss: 0.050158; Time: 141.0425s
+Test	RNAMSM	f1s: 0.9190	precision: 0.9215	recall: 0.9192	accuracy: 0.9192	mcc: 0.9128	 ; Time: 19.6087s
+Epoch: 20
+Train	Loss: 0.013368; Time: 141.7309s
+Test	RNAMSM	f1s: 0.9143	precision: 0.9178	recall: 0.9142	accuracy: 0.9142	mcc: 0.9074	 ; Time: 19.5639s
+Epoch: 21
+Train	Loss: 0.134590; Time: 140.6552s
+Test	RNAMSM	f1s: 0.9274	precision: 0.9285	recall: 0.9277	accuracy: 0.9277	mcc: 0.9218	 ; Time: 19.4816s
+Epoch: 22
+Train	Loss: 0.062079; Time: 141.0384s
+Test	RNAMSM	f1s: 0.8933	precision: 0.9027	recall: 0.8942	accuracy: 0.8942	mcc: 0.8863	 ; Time: 19.5342s
+Epoch: 23
+Train	Loss: 0.143665; Time: 141.4025s
+Test	RNAMSM	f1s: 0.9259	precision: 0.9274	recall: 0.9262	accuracy: 0.9262	mcc: 0.9202	 ; Time: 19.3760s
+Epoch: 24
+Train	Loss: 0.020310; Time: 141.1563s
+Test	RNAMSM	f1s: 0.9205	precision: 0.9226	recall: 0.9204	accuracy: 0.9204	mcc: 0.9139	 ; Time: 19.6244s
+Epoch: 25
+Train	Loss: 0.024749; Time: 141.1308s
+Test	RNAMSM	f1s: 0.9233	precision: 0.9250	recall: 0.9231	accuracy: 0.9231	mcc: 0.9168	 ; Time: 19.5021s
+Epoch: 26
+Train	Loss: 0.010883; Time: 141.8252s
+Test	RNAMSM	f1s: 0.9122	precision: 0.9164	recall: 0.9135	accuracy: 0.9135	mcc: 0.9067	 ; Time: 19.4320s
+Epoch: 27
+Train	Loss: 0.054791; Time: 141.1820s
+Test	RNAMSM	f1s: 0.9074	precision: 0.9115	recall: 0.9085	accuracy: 0.9085	mcc: 0.9012	 ; Time: 19.5839s
+Epoch: 28
+Train	Loss: 0.007865; Time: 141.6980s
+Test	RNAMSM	f1s: 0.9237	precision: 0.9251	recall: 0.9250	accuracy: 0.9250	mcc: 0.9190	 ; Time: 19.4870s
+Epoch: 29
+Train	Loss: 0.022624; Time: 141.6212s
+Test	RNAMSM	f1s: 0.9204	precision: 0.9247	recall: 0.9200	accuracy: 0.9200	mcc: 0.9137	 ; Time: 19.5370s
+RNAErnie
+Trainable parameters: 87239437
+Epoch: 0
+Train	Loss: 0.396601; Time: 140.7078s
+Test	RNAErnie	f1s: 0.8622	precision: 0.8815	recall: 0.8638	accuracy: 0.8638	mcc: 0.8542	 ; Time: 19.2315s
+Epoch: 1
+Train	Loss: 0.428124; Time: 140.3991s
+Test	RNAErnie	f1s: 0.9017	precision: 0.9071	recall: 0.9035	accuracy: 0.9035	mcc: 0.8961	 ; Time: 19.2567s
+Epoch: 2
+Train	Loss: 0.038276; Time: 140.4081s
+Test	RNAErnie	f1s: 0.8972	precision: 0.9041	recall: 0.9023	accuracy: 0.9023	mcc: 0.8951	 ; Time: 19.3336s
+Epoch: 3
+Train	Loss: 0.113083; Time: 140.1112s
+Test	RNAErnie	f1s: 0.9361	precision: 0.9393	recall: 0.9358	accuracy: 0.9358	mcc: 0.9307	 ; Time: 19.1156s
+Epoch: 4
+Train	Loss: 0.141618; Time: 139.6525s
+Test	RNAErnie	f1s: 0.9345	precision: 0.9389	recall: 0.9350	accuracy: 0.9350	mcc: 0.9300	 ; Time: 19.1713s
+Epoch: 5
+Train	Loss: 0.239663; Time: 140.7101s
+Test	RNAErnie	f1s: 0.9162	precision: 0.9226	recall: 0.9181	accuracy: 0.9181	mcc: 0.9119	 ; Time: 19.1822s
+Epoch: 6
+Train	Loss: 0.256062; Time: 139.7452s
+Test	RNAErnie	f1s: 0.9318	precision: 0.9404	recall: 0.9300	accuracy: 0.9300	mcc: 0.9249	 ; Time: 19.2460s
+Epoch: 7
+Train	Loss: 0.269745; Time: 140.2416s
+Test	RNAErnie	f1s: 0.9181	precision: 0.9263	recall: 0.9185	accuracy: 0.9185	mcc: 0.9123	 ; Time: 19.3449s
+Epoch: 8
+Train	Loss: 0.201611; Time: 139.5356s
+Test	RNAErnie	f1s: 0.9372	precision: 0.9382	recall: 0.9377	accuracy: 0.9377	mcc: 0.9326	 ; Time: 19.3090s
+Epoch: 9
+Train	Loss: 0.129512; Time: 139.3710s
+Test	RNAErnie	f1s: 0.9445	precision: 0.9462	recall: 0.9442	accuracy: 0.9442	mcc: 0.9397	 ; Time: 18.9488s
+Epoch: 10
+Train	Loss: 0.094252; Time: 139.5906s
+Test	RNAErnie	f1s: 0.9396	precision: 0.9412	recall: 0.9400	accuracy: 0.9400	mcc: 0.9352	 ; Time: 19.1787s
+Epoch: 11
+Train	Loss: 0.108253; Time: 139.1621s
+Test	RNAErnie	f1s: 0.9379	precision: 0.9391	recall: 0.9381	accuracy: 0.9381	mcc: 0.9330	 ; Time: 19.2449s
+Epoch: 12
+Train	Loss: 0.062774; Time: 139.4578s
+Test	RNAErnie	f1s: 0.9493	precision: 0.9499	recall: 0.9492	accuracy: 0.9492	mcc: 0.9450	 ; Time: 19.4100s
+Epoch: 13
+Train	Loss: 0.221746; Time: 140.3302s
+Test	RNAErnie	f1s: 0.9339	precision: 0.9362	recall: 0.9342	accuracy: 0.9342	mcc: 0.9290	 ; Time: 19.0799s
+Epoch: 14
+Train	Loss: 0.154373; Time: 139.5429s
+Test	RNAErnie	f1s: 0.9248	precision: 0.9316	recall: 0.9242	accuracy: 0.9242	mcc: 0.9184	 ; Time: 19.2910s
+Epoch: 15
+Train	Loss: 0.041938; Time: 139.5677s
+Test	RNAErnie	f1s: 0.9340	precision: 0.9390	recall: 0.9342	accuracy: 0.9342	mcc: 0.9293	 ; Time: 19.2470s
+Epoch: 16
+Train	Loss: 0.122464; Time: 139.1284s
+Test	RNAErnie	f1s: 0.9328	precision: 0.9347	recall: 0.9335	accuracy: 0.9335	mcc: 0.9281	 ; Time: 18.9442s
+Epoch: 17
+Train	Loss: 0.199019; Time: 139.2298s
+Test	RNAErnie	f1s: 0.9119	precision: 0.9221	recall: 0.9131	accuracy: 0.9131	mcc: 0.9067	 ; Time: 19.2131s
+Epoch: 18
+Train	Loss: 0.083747; Time: 140.5788s
+Test	RNAErnie	f1s: 0.9563	precision: 0.9581	recall: 0.9558	accuracy: 0.9558	mcc: 0.9522	 ; Time: 19.2922s
+Epoch: 19
+Train	Loss: 0.416007; Time: 140.2594s
+Test	RNAErnie	f1s: 0.9196	precision: 0.9289	recall: 0.9181	accuracy: 0.9181	mcc: 0.9119	 ; Time: 19.3758s
+Epoch: 20
+Train	Loss: 0.014260; Time: 140.0696s
+Test	RNAErnie	f1s: 0.9503	precision: 0.9530	recall: 0.9500	accuracy: 0.9500	mcc: 0.9461	 ; Time: 19.3371s
+Epoch: 21
+Train	Loss: 0.005088; Time: 139.5932s
+Test	RNAErnie	f1s: 0.9241	precision: 0.9278	recall: 0.9250	accuracy: 0.9250	mcc: 0.9191	 ; Time: 19.0277s
+Epoch: 22
+Train	Loss: 0.100042; Time: 139.2168s
+Test	RNAErnie	f1s: 0.9361	precision: 0.9368	recall: 0.9365	accuracy: 0.9365	mcc: 0.9314	 ; Time: 19.3050s
+Epoch: 23
+Train	Loss: 0.054875; Time: 139.6046s
+Test	RNAErnie	f1s: 0.9368	precision: 0.9402	recall: 0.9373	accuracy: 0.9373	mcc: 0.9325	 ; Time: 19.2020s
+Epoch: 24
+Train	Loss: 0.122907; Time: 139.8965s
+Test	RNAErnie	f1s: 0.9309	precision: 0.9331	recall: 0.9323	accuracy: 0.9323	mcc: 0.9270	 ; Time: 19.3528s
+Epoch: 25
+Train	Loss: 0.254029; Time: 139.8886s
+Test	RNAErnie	f1s: 0.9272	precision: 0.9297	recall: 0.9273	accuracy: 0.9273	mcc: 0.9215	 ; Time: 19.2909s
+Epoch: 26
+Train	Loss: 0.050492; Time: 139.4630s
+Test	RNAErnie	f1s: 0.9061	precision: 0.9120	recall: 0.9081	accuracy: 0.9081	mcc: 0.9011	 ; Time: 19.0778s
+Epoch: 27
+Train	Loss: 0.023832; Time: 140.0048s
+Test	RNAErnie	f1s: 0.9276	precision: 0.9312	recall: 0.9281	accuracy: 0.9281	mcc: 0.9224	 ; Time: 19.1572s
+Epoch: 28
+Train	Loss: 0.087752; Time: 139.5751s
+Test	RNAErnie	f1s: 0.9380	precision: 0.9389	recall: 0.9381	accuracy: 0.9381	mcc: 0.9330	 ; Time: 19.4036s
+Epoch: 29
+Train	Loss: 0.001141; Time: 139.9556s
+Test	RNAErnie	f1s: 0.9433	precision: 0.9443	recall: 0.9431	accuracy: 0.9431	mcc: 0.9384	 ; Time: 19.3444s
+RNABERT
+vocab: OrderedDict([(0, '[PAD]'), (1, '[CLS]'), (2, 'A'), (3, 'U'), (4, 'G'), (5, 'C')])
+model/RNABERT/RNABERT.json
+Trainable parameters: 480013
+Epoch: 0
+Train	Loss: 2.359638; Time: 13.7468s
+Test	RNABERT	f1s: 0.0654	precision: 0.1652	recall: 0.1604	accuracy: 0.1604	mcc: 0.1239	 ; Time: 2.0380s
+Epoch: 1
+Train	Loss: 2.172014; Time: 13.2369s
+Test	RNABERT	f1s: 0.2254	precision: 0.2063	recall: 0.3435	accuracy: 0.3435	mcc: 0.3124	 ; Time: 2.0131s
+Epoch: 2
+Train	Loss: 1.691941; Time: 13.2132s
+Test	RNABERT	f1s: 0.2838	precision: 0.2808	recall: 0.3981	accuracy: 0.3981	mcc: 0.3660	 ; Time: 2.0407s
+Epoch: 3
+Train	Loss: 1.554337; Time: 13.2396s
+Test	RNABERT	f1s: 0.3844	precision: 0.3946	recall: 0.4658	accuracy: 0.4658	mcc: 0.4334	 ; Time: 2.0288s
+Epoch: 4
+Train	Loss: 1.487219; Time: 13.2849s
+Test	RNABERT	f1s: 0.4828	precision: 0.5068	recall: 0.5215	accuracy: 0.5215	mcc: 0.4876	 ; Time: 2.0062s
+Epoch: 5
+Train	Loss: 1.197477; Time: 13.2813s
+Test	RNABERT	f1s: 0.4954	precision: 0.5019	recall: 0.5338	accuracy: 0.5338	mcc: 0.4995	 ; Time: 1.9995s
+Epoch: 6
+Train	Loss: 1.293755; Time: 13.1358s
+Test	RNABERT	f1s: 0.5326	precision: 0.5396	recall: 0.5581	accuracy: 0.5581	mcc: 0.5239	 ; Time: 2.0098s
+Epoch: 7
+Train	Loss: 0.890794; Time: 13.0739s
+Test	RNABERT	f1s: 0.5458	precision: 0.5523	recall: 0.5681	accuracy: 0.5681	mcc: 0.5346	 ; Time: 2.0643s
+Epoch: 8
+Train	Loss: 1.062591; Time: 13.2653s
+Test	RNABERT	f1s: 0.5393	precision: 0.5506	recall: 0.5646	accuracy: 0.5646	mcc: 0.5316	 ; Time: 1.9990s
+Epoch: 9
+Train	Loss: 1.087602; Time: 13.3287s
+Test	RNABERT	f1s: 0.5582	precision: 0.5689	recall: 0.5785	accuracy: 0.5785	mcc: 0.5460	 ; Time: 2.0350s
+Epoch: 10
+Train	Loss: 1.219079; Time: 13.3153s
+Test	RNABERT	f1s: 0.6024	precision: 0.6164	recall: 0.6065	accuracy: 0.6065	mcc: 0.5754	 ; Time: 2.0252s
+Epoch: 11
+Train	Loss: 0.894276; Time: 13.1883s
+Test	RNABERT	f1s: 0.6196	precision: 0.6254	recall: 0.6273	accuracy: 0.6273	mcc: 0.5974	 ; Time: 2.0317s
+Epoch: 12
+Train	Loss: 0.973273; Time: 13.4220s
+Test	RNABERT	f1s: 0.5823	precision: 0.5982	recall: 0.5958	accuracy: 0.5958	mcc: 0.5649	 ; Time: 2.0179s
+Epoch: 13
+Train	Loss: 0.900522; Time: 13.3096s
+Test	RNABERT	f1s: 0.6144	precision: 0.6262	recall: 0.6181	accuracy: 0.6181	mcc: 0.5877	 ; Time: 2.0691s
+Epoch: 14
+Train	Loss: 0.805524; Time: 13.1907s
+Test	RNABERT	f1s: 0.6156	precision: 0.6235	recall: 0.6246	accuracy: 0.6246	mcc: 0.5950	 ; Time: 2.0000s
+Epoch: 15
+Train	Loss: 1.154748; Time: 13.4373s
+Test	RNABERT	f1s: 0.6313	precision: 0.6387	recall: 0.6354	accuracy: 0.6354	mcc: 0.6061	 ; Time: 2.0432s
+Epoch: 16
+Train	Loss: 0.610968; Time: 13.3925s
+Test	RNABERT	f1s: 0.6417	precision: 0.6469	recall: 0.6442	accuracy: 0.6442	mcc: 0.6153	 ; Time: 2.0253s
+Epoch: 17
+Train	Loss: 0.669206; Time: 13.3231s
+Test	RNABERT	f1s: 0.6440	precision: 0.6511	recall: 0.6488	accuracy: 0.6488	mcc: 0.6206	 ; Time: 1.9807s
+Epoch: 18
+Train	Loss: 0.601554; Time: 13.1629s
+Test	RNABERT	f1s: 0.6377	precision: 0.6425	recall: 0.6427	accuracy: 0.6427	mcc: 0.6137	 ; Time: 2.0194s
+Epoch: 19
+Train	Loss: 0.481944; Time: 13.1900s
+Test	RNABERT	f1s: 0.6484	precision: 0.6579	recall: 0.6496	accuracy: 0.6496	mcc: 0.6217	 ; Time: 2.0143s
+Epoch: 20
+Train	Loss: 0.781151; Time: 13.1511s
+Test	RNABERT	f1s: 0.6558	precision: 0.6627	recall: 0.6581	accuracy: 0.6581	mcc: 0.6304	 ; Time: 1.9952s
+Epoch: 21
+Train	Loss: 0.693797; Time: 13.3884s
+Test	RNABERT	f1s: 0.6507	precision: 0.6617	recall: 0.6527	accuracy: 0.6527	mcc: 0.6253	 ; Time: 2.0036s
+Epoch: 22
+Train	Loss: 0.660127; Time: 13.2193s
+Test	RNABERT	f1s: 0.6600	precision: 0.6651	recall: 0.6619	accuracy: 0.6619	mcc: 0.6343	 ; Time: 2.0254s
+Epoch: 23
+Train	Loss: 0.893080; Time: 13.3815s
+Test	RNABERT	f1s: 0.6658	precision: 0.6746	recall: 0.6669	accuracy: 0.6669	mcc: 0.6400	 ; Time: 2.0231s
+Epoch: 24
+Train	Loss: 0.803234; Time: 13.1681s
+Test	RNABERT	f1s: 0.6686	precision: 0.6756	recall: 0.6708	accuracy: 0.6708	mcc: 0.6442	 ; Time: 2.0986s
+Epoch: 25
+Train	Loss: 0.420353; Time: 13.2027s
+Test	RNABERT	f1s: 0.6755	precision: 0.6835	recall: 0.6735	accuracy: 0.6735	mcc: 0.6468	 ; Time: 2.0043s
+Epoch: 26
+Train	Loss: 0.672225; Time: 13.1801s
+Test	RNABERT	f1s: 0.6724	precision: 0.6801	recall: 0.6731	accuracy: 0.6731	mcc: 0.6465	 ; Time: 2.0720s
+Epoch: 27
+Train	Loss: 0.397364; Time: 13.3757s
+Test	RNABERT	f1s: 0.6781	precision: 0.6867	recall: 0.6785	accuracy: 0.6785	mcc: 0.6524	 ; Time: 2.0237s
+Epoch: 28
+Train	Loss: 0.448356; Time: 13.4369s
+Test	RNABERT	f1s: 0.6768	precision: 0.6810	recall: 0.6769	accuracy: 0.6769	mcc: 0.6503	 ; Time: 2.0967s
+Epoch: 29
+Train	Loss: 0.486935; Time: 13.2177s
+Test	RNABERT	f1s: 0.6757	precision: 0.6827	recall: 0.6758	accuracy: 0.6758	mcc: 0.6493	 ; Time: 1.9877s
+DNABERT
+Trainable parameters: 86104333
+Epoch: 0
+Train	Loss: 0.897356; Time: 139.8099s
+Test	DNABERT	f1s: 0.8129	precision: 0.8229	recall: 0.8192	accuracy: 0.8192	mcc: 0.8054	 ; Time: 19.1745s
+Epoch: 1
+Train	Loss: 0.492639; Time: 139.7442s
+Test	DNABERT	f1s: 0.8926	precision: 0.9019	recall: 0.8919	accuracy: 0.8919	mcc: 0.8836	 ; Time: 19.1992s
+Epoch: 2
+Train	Loss: 0.163735; Time: 139.5856s
+Test	DNABERT	f1s: 0.9199	precision: 0.9226	recall: 0.9196	accuracy: 0.9196	mcc: 0.9132	 ; Time: 18.9958s
+Epoch: 3
+Train	Loss: 0.048171; Time: 138.9218s
+Test	DNABERT	f1s: 0.9227	precision: 0.9255	recall: 0.9227	accuracy: 0.9227	mcc: 0.9165	 ; Time: 19.1691s
+Epoch: 4
+Train	Loss: 0.023909; Time: 139.3524s
+Test	DNABERT	f1s: 0.9378	precision: 0.9385	recall: 0.9377	accuracy: 0.9377	mcc: 0.9326	 ; Time: 19.1315s
+Epoch: 5
+Train	Loss: 0.075889; Time: 140.4016s
+Test	DNABERT	f1s: 0.9213	precision: 0.9277	recall: 0.9215	accuracy: 0.9215	mcc: 0.9156	 ; Time: 19.2618s
+Epoch: 6
+Train	Loss: 0.180634; Time: 139.8315s
+Test	DNABERT	f1s: 0.9356	precision: 0.9368	recall: 0.9362	accuracy: 0.9362	mcc: 0.9310	 ; Time: 18.9819s
+Epoch: 7
+Train	Loss: 0.042672; Time: 139.2992s
+Test	DNABERT	f1s: 0.9293	precision: 0.9324	recall: 0.9292	accuracy: 0.9292	mcc: 0.9236	 ; Time: 19.2301s
+Epoch: 8
+Train	Loss: 0.068269; Time: 140.2916s
+Test	DNABERT	f1s: 0.9302	precision: 0.9317	recall: 0.9308	accuracy: 0.9308	mcc: 0.9252	 ; Time: 19.2765s
+Epoch: 9
+Train	Loss: 0.009900; Time: 139.2443s
+Test	DNABERT	f1s: 0.9387	precision: 0.9400	recall: 0.9388	accuracy: 0.9388	mcc: 0.9339	 ; Time: 19.2808s
+Epoch: 10
+Train	Loss: 0.026649; Time: 140.0322s
+Test	DNABERT	f1s: 0.9348	precision: 0.9360	recall: 0.9354	accuracy: 0.9354	mcc: 0.9302	 ; Time: 18.9672s
+Epoch: 11
+Train	Loss: 0.193242; Time: 139.2822s
+Test	DNABERT	f1s: 0.9192	precision: 0.9293	recall: 0.9181	accuracy: 0.9181	mcc: 0.9121	 ; Time: 19.2070s
+Epoch: 12
+Train	Loss: 0.134111; Time: 139.8892s
+Test	DNABERT	f1s: 0.9279	precision: 0.9316	recall: 0.9281	accuracy: 0.9281	mcc: 0.9224	 ; Time: 19.2932s
+Epoch: 13
+Train	Loss: 0.009890; Time: 139.6930s
+Test	DNABERT	f1s: 0.9472	precision: 0.9483	recall: 0.9473	accuracy: 0.9473	mcc: 0.9430	 ; Time: 19.1032s
+Epoch: 14
+Train	Loss: 0.026149; Time: 140.3320s
+Test	DNABERT	f1s: 0.9235	precision: 0.9293	recall: 0.9238	accuracy: 0.9238	mcc: 0.9180	 ; Time: 19.1093s
+Epoch: 15
+Train	Loss: 0.000641; Time: 139.9216s
+Test	DNABERT	f1s: 0.9342	precision: 0.9392	recall: 0.9335	accuracy: 0.9335	mcc: 0.9284	 ; Time: 19.2273s
+Epoch: 16
+Train	Loss: 0.052976; Time: 139.5474s
+Test	DNABERT	f1s: 0.9382	precision: 0.9414	recall: 0.9381	accuracy: 0.9381	mcc: 0.9332	 ; Time: 19.1921s
+Epoch: 17
+Train	Loss: 0.001332; Time: 138.6696s
+Test	DNABERT	f1s: 0.9407	precision: 0.9424	recall: 0.9404	accuracy: 0.9404	mcc: 0.9355	 ; Time: 19.1879s
+Epoch: 18
+Train	Loss: 0.002395; Time: 139.2376s
+Test	DNABERT	f1s: 0.9421	precision: 0.9434	recall: 0.9415	accuracy: 0.9415	mcc: 0.9367	 ; Time: 19.2110s
+Epoch: 19
+Train	Loss: 0.065604; Time: 139.7689s
+Test	DNABERT	f1s: 0.9445	precision: 0.9450	recall: 0.9446	accuracy: 0.9446	mcc: 0.9401	 ; Time: 19.3345s
+Epoch: 20
+Train	Loss: 0.009314; Time: 140.0854s
+Test	DNABERT	f1s: 0.9451	precision: 0.9459	recall: 0.9454	accuracy: 0.9454	mcc: 0.9409	 ; Time: 19.1608s
+Epoch: 21
+Train	Loss: 0.052460; Time: 139.6368s
+Test	DNABERT	f1s: 0.9343	precision: 0.9369	recall: 0.9338	accuracy: 0.9338	mcc: 0.9285	 ; Time: 19.2743s
+Epoch: 22
+Train	Loss: 0.059705; Time: 140.4713s
+Test	DNABERT	f1s: 0.9433	precision: 0.9448	recall: 0.9435	accuracy: 0.9435	mcc: 0.9389	 ; Time: 19.4043s
+Epoch: 23
+Train	Loss: 0.001488; Time: 140.1119s
+Test	DNABERT	f1s: 0.9548	precision: 0.9581	recall: 0.9538	accuracy: 0.9538	mcc: 0.9503	 ; Time: 18.9698s
+Epoch: 24
+Train	Loss: 0.000553; Time: 139.6582s
+Test	DNABERT	f1s: 0.9479	precision: 0.9496	recall: 0.9473	accuracy: 0.9473	mcc: 0.9430	 ; Time: 19.0570s
+Epoch: 25
+Train	Loss: 0.001424; Time: 140.2947s
+Test	DNABERT	f1s: 0.9444	precision: 0.9464	recall: 0.9446	accuracy: 0.9446	mcc: 0.9402	 ; Time: 19.3149s
+Epoch: 26
+Train	Loss: 0.000626; Time: 140.0688s
+Test	DNABERT	f1s: 0.9449	precision: 0.9459	recall: 0.9450	accuracy: 0.9450	mcc: 0.9405	 ; Time: 19.2922s
+Epoch: 27
+Train	Loss: 0.000813; Time: 139.1929s
+Test	DNABERT	f1s: 0.9447	precision: 0.9462	recall: 0.9446	accuracy: 0.9446	mcc: 0.9401	 ; Time: 19.3425s
+Epoch: 28
+Train	Loss: 0.000873; Time: 139.7122s
+Test	DNABERT	f1s: 0.9502	precision: 0.9512	recall: 0.9500	accuracy: 0.9500	mcc: 0.9459	 ; Time: 19.1303s
+Epoch: 29
+Train	Loss: 0.002363; Time: 139.8281s
+Test	DNABERT	f1s: 0.9364	precision: 0.9401	recall: 0.9369	accuracy: 0.9369	mcc: 0.9320	 ; Time: 19.0933s
+SpliceBERT
+Trainable parameters: 19452941
+Epoch: 0
+Train	Loss: 0.996500; Time: 45.8622s
+Test	SpliceBERT	f1s: 0.7446	precision: 0.7759	recall: 0.7662	accuracy: 0.7662	mcc: 0.7497	 ; Time: 6.1551s
+Epoch: 1
+Train	Loss: 0.500265; Time: 45.2202s
+Test	SpliceBERT	f1s: 0.8708	precision: 0.8842	recall: 0.8723	accuracy: 0.8723	mcc: 0.8631	 ; Time: 6.0718s
+Epoch: 2
+Train	Loss: 0.313875; Time: 45.6468s
+Test	SpliceBERT	f1s: 0.9326	precision: 0.9340	recall: 0.9323	accuracy: 0.9323	mcc: 0.9268	 ; Time: 6.1996s
+Epoch: 3
+Train	Loss: 0.061418; Time: 45.7124s
+Test	SpliceBERT	f1s: 0.9298	precision: 0.9327	recall: 0.9308	accuracy: 0.9308	mcc: 0.9253	 ; Time: 6.1401s
+Epoch: 4
+Train	Loss: 0.024183; Time: 45.6420s
+Test	SpliceBERT	f1s: 0.9379	precision: 0.9406	recall: 0.9388	accuracy: 0.9388	mcc: 0.9341	 ; Time: 6.1580s
+Epoch: 5
+Train	Loss: 0.008589; Time: 45.4807s
+Test	SpliceBERT	f1s: 0.9514	precision: 0.9526	recall: 0.9515	accuracy: 0.9515	mcc: 0.9476	 ; Time: 6.1553s
+Epoch: 6
+Train	Loss: 0.008538; Time: 45.6510s
+Test	SpliceBERT	f1s: 0.9358	precision: 0.9388	recall: 0.9358	accuracy: 0.9358	mcc: 0.9307	 ; Time: 6.1711s
+Epoch: 7
+Train	Loss: 0.002507; Time: 45.6011s
+Test	SpliceBERT	f1s: 0.9530	precision: 0.9533	recall: 0.9535	accuracy: 0.9535	mcc: 0.9496	 ; Time: 6.2679s
+Epoch: 8
+Train	Loss: 0.012163; Time: 45.8528s
+Test	SpliceBERT	f1s: 0.9440	precision: 0.9460	recall: 0.9442	accuracy: 0.9442	mcc: 0.9398	 ; Time: 6.2589s
+Epoch: 9
+Train	Loss: 0.063704; Time: 45.7511s
+Test	SpliceBERT	f1s: 0.9513	precision: 0.9524	recall: 0.9515	accuracy: 0.9515	mcc: 0.9476	 ; Time: 6.0803s
+Epoch: 10
+Train	Loss: 0.047702; Time: 45.2714s
+Test	SpliceBERT	f1s: 0.9554	precision: 0.9560	recall: 0.9554	accuracy: 0.9554	mcc: 0.9517	 ; Time: 6.1217s
+Epoch: 11
+Train	Loss: 0.003113; Time: 45.5503s
+Test	SpliceBERT	f1s: 0.9524	precision: 0.9534	recall: 0.9527	accuracy: 0.9527	mcc: 0.9489	 ; Time: 6.2084s
+Epoch: 12
+Train	Loss: 0.001830; Time: 45.7541s
+Test	SpliceBERT	f1s: 0.9553	precision: 0.9559	recall: 0.9554	accuracy: 0.9554	mcc: 0.9517	 ; Time: 6.2443s
+Epoch: 13
+Train	Loss: 0.001993; Time: 45.8032s
+Test	SpliceBERT	f1s: 0.9550	precision: 0.9567	recall: 0.9550	accuracy: 0.9550	mcc: 0.9514	 ; Time: 6.1491s
+Epoch: 14
+Train	Loss: 0.005011; Time: 45.3846s
+Test	SpliceBERT	f1s: 0.9529	precision: 0.9544	recall: 0.9531	accuracy: 0.9531	mcc: 0.9493	 ; Time: 6.3127s
+Epoch: 15
+Train	Loss: 0.010667; Time: 45.6219s
+Test	SpliceBERT	f1s: 0.9546	precision: 0.9551	recall: 0.9550	accuracy: 0.9550	mcc: 0.9513	 ; Time: 6.2633s
+Epoch: 16
+Train	Loss: 0.002285; Time: 45.5048s
+Test	SpliceBERT	f1s: 0.9605	precision: 0.9608	recall: 0.9604	accuracy: 0.9604	mcc: 0.9571	 ; Time: 6.1502s
+Epoch: 17
+Train	Loss: 0.005206; Time: 45.2688s
+Test	SpliceBERT	f1s: 0.9606	precision: 0.9609	recall: 0.9608	accuracy: 0.9608	mcc: 0.9575	 ; Time: 6.0888s
+Epoch: 18
+Train	Loss: 0.005352; Time: 45.3711s
+Test	SpliceBERT	f1s: 0.9609	precision: 0.9616	recall: 0.9608	accuracy: 0.9608	mcc: 0.9575	 ; Time: 6.1583s
+Epoch: 19
+Train	Loss: 0.006440; Time: 45.7132s
+Test	SpliceBERT	f1s: 0.9639	precision: 0.9646	recall: 0.9638	accuracy: 0.9638	mcc: 0.9609	 ; Time: 6.1381s
+Epoch: 20
+Train	Loss: 0.001041; Time: 45.6147s
+Test	SpliceBERT	f1s: 0.9639	precision: 0.9645	recall: 0.9638	accuracy: 0.9638	mcc: 0.9609	 ; Time: 6.2334s
+Epoch: 21
+Train	Loss: 0.000847; Time: 45.4955s
+Test	SpliceBERT	f1s: 0.9650	precision: 0.9656	recall: 0.9650	accuracy: 0.9650	mcc: 0.9621	 ; Time: 6.1506s
+Epoch: 22
+Train	Loss: 0.055250; Time: 45.5799s
+Test	SpliceBERT	f1s: 0.9356	precision: 0.9449	recall: 0.9342	accuracy: 0.9342	mcc: 0.9296	 ; Time: 6.2070s
+Epoch: 23
+Train	Loss: 0.018417; Time: 45.6881s
+Test	SpliceBERT	f1s: 0.9600	precision: 0.9606	recall: 0.9600	accuracy: 0.9600	mcc: 0.9567	 ; Time: 6.1769s
+Epoch: 24
+Train	Loss: 0.000729; Time: 45.6557s
+Test	SpliceBERT	f1s: 0.9514	precision: 0.9529	recall: 0.9515	accuracy: 0.9515	mcc: 0.9476	 ; Time: 6.1138s
+Epoch: 25
+Train	Loss: 0.002530; Time: 45.5460s
+Test	SpliceBERT	f1s: 0.9494	precision: 0.9506	recall: 0.9496	accuracy: 0.9496	mcc: 0.9455	 ; Time: 6.1519s
+Epoch: 26
+Train	Loss: 0.002011; Time: 45.7714s
+Test	SpliceBERT	f1s: 0.9527	precision: 0.9565	recall: 0.9523	accuracy: 0.9523	mcc: 0.9487	 ; Time: 6.1075s
+Epoch: 27
+Train	Loss: 0.076459; Time: 45.6169s
+Test	SpliceBERT	f1s: 0.9529	precision: 0.9553	recall: 0.9531	accuracy: 0.9531	mcc: 0.9494	 ; Time: 6.2505s
+Epoch: 28
+Train	Loss: 0.001413; Time: 45.7497s
+Test	SpliceBERT	f1s: 0.9547	precision: 0.9558	recall: 0.9550	accuracy: 0.9550	mcc: 0.9514	 ; Time: 6.0910s
+Epoch: 29
+Train	Loss: 0.001983; Time: 45.2510s
+Test	SpliceBERT	f1s: 0.9557	precision: 0.9581	recall: 0.9562	accuracy: 0.9562	mcc: 0.9528	 ; Time: 6.1229s
+DNABERT2
+Trainable parameters: 117078541
+Epoch: 0
+Train	Loss: 0.672030; Time: 52.6092s
+Test	DNABERT2	f1s: 0.6678	precision: 0.7370	recall: 0.6804	accuracy: 0.6804	mcc: 0.6600	 ; Time: 6.5180s
+Epoch: 1
+Train	Loss: 0.321660; Time: 52.1667s
+Test	DNABERT2	f1s: 0.8672	precision: 0.8712	recall: 0.8688	accuracy: 0.8688	mcc: 0.8584	 ; Time: 6.5021s
+Epoch: 2
+Train	Loss: 0.256335; Time: 52.1091s
+Test	DNABERT2	f1s: 0.9214	precision: 0.9221	recall: 0.9212	accuracy: 0.9212	mcc: 0.9146	 ; Time: 6.4921s
+Epoch: 3
+Train	Loss: 0.084968; Time: 52.1328s
+Test	DNABERT2	f1s: 0.9333	precision: 0.9354	recall: 0.9335	accuracy: 0.9335	mcc: 0.9281	 ; Time: 6.4895s
+Epoch: 4
+Train	Loss: 0.057365; Time: 52.1812s
+Test	DNABERT2	f1s: 0.9379	precision: 0.9406	recall: 0.9381	accuracy: 0.9381	mcc: 0.9332	 ; Time: 6.4746s
+Epoch: 5
+Train	Loss: 0.010609; Time: 51.9542s
+Test	DNABERT2	f1s: 0.9191	precision: 0.9239	recall: 0.9200	accuracy: 0.9200	mcc: 0.9138	 ; Time: 6.5326s
+Epoch: 6
+Train	Loss: 0.030127; Time: 51.9979s
+Test	DNABERT2	f1s: 0.9291	precision: 0.9332	recall: 0.9285	accuracy: 0.9285	mcc: 0.9228	 ; Time: 6.4616s
+Epoch: 7
+Train	Loss: 0.297322; Time: 52.0764s
+Test	DNABERT2	f1s: 0.9113	precision: 0.9216	recall: 0.9100	accuracy: 0.9100	mcc: 0.9035	 ; Time: 6.5194s
+Epoch: 8
+Train	Loss: 0.087764; Time: 52.0292s
+Test	DNABERT2	f1s: 0.9272	precision: 0.9328	recall: 0.9265	accuracy: 0.9265	mcc: 0.9208	 ; Time: 6.5262s
+Epoch: 9
+Train	Loss: 0.003003; Time: 52.0098s
+Test	DNABERT2	f1s: 0.9361	precision: 0.9408	recall: 0.9354	accuracy: 0.9354	mcc: 0.9304	 ; Time: 6.5628s
+Epoch: 10
+Train	Loss: 0.046980; Time: 52.0399s
+Test	DNABERT2	f1s: 0.9357	precision: 0.9401	recall: 0.9354	accuracy: 0.9354	mcc: 0.9303	 ; Time: 6.5163s
+Epoch: 11
+Train	Loss: 0.002464; Time: 51.9030s
+Test	DNABERT2	f1s: 0.9382	precision: 0.9393	recall: 0.9385	accuracy: 0.9385	mcc: 0.9335	 ; Time: 6.4559s
+Epoch: 12
+Train	Loss: 0.061221; Time: 52.0003s
+Test	DNABERT2	f1s: 0.9189	precision: 0.9211	recall: 0.9204	accuracy: 0.9204	mcc: 0.9141	 ; Time: 6.4537s
+Epoch: 13
+Train	Loss: 0.004841; Time: 51.8969s
+Test	DNABERT2	f1s: 0.9289	precision: 0.9339	recall: 0.9292	accuracy: 0.9292	mcc: 0.9239	 ; Time: 6.4389s
+Epoch: 14
+Train	Loss: 0.016433; Time: 51.9546s
+Test	DNABERT2	f1s: 0.9210	precision: 0.9297	recall: 0.9200	accuracy: 0.9200	mcc: 0.9141	 ; Time: 6.5231s
+Epoch: 15
+Train	Loss: 0.008052; Time: 52.0553s
+Test	DNABERT2	f1s: 0.9331	precision: 0.9433	recall: 0.9312	accuracy: 0.9312	mcc: 0.9264	 ; Time: 6.5756s
+Epoch: 16
+Train	Loss: 0.059533; Time: 52.1195s
+Test	DNABERT2	f1s: 0.9316	precision: 0.9363	recall: 0.9315	accuracy: 0.9315	mcc: 0.9262	 ; Time: 6.5120s
+Epoch: 17
+Train	Loss: 0.009337; Time: 51.8934s
+Test	DNABERT2	f1s: 0.9305	precision: 0.9342	recall: 0.9304	accuracy: 0.9304	mcc: 0.9249	 ; Time: 6.4594s
+Epoch: 18
+Train	Loss: 0.001745; Time: 52.1663s
+Test	DNABERT2	f1s: 0.9303	precision: 0.9340	recall: 0.9304	accuracy: 0.9304	mcc: 0.9249	 ; Time: 6.5155s
+Epoch: 19
+Train	Loss: 0.002129; Time: 52.0826s
+Test	DNABERT2	f1s: 0.9362	precision: 0.9378	recall: 0.9369	accuracy: 0.9369	mcc: 0.9319	 ; Time: 6.4435s
+Epoch: 20
+Train	Loss: 0.037540; Time: 52.0111s
+Test	DNABERT2	f1s: 0.9296	precision: 0.9344	recall: 0.9304	accuracy: 0.9304	mcc: 0.9251	 ; Time: 6.4488s
+Epoch: 21
+Train	Loss: 0.002361; Time: 52.0627s
+Test	DNABERT2	f1s: 0.9389	precision: 0.9407	recall: 0.9385	accuracy: 0.9385	mcc: 0.9335	 ; Time: 6.5220s
+Epoch: 22
+Train	Loss: 0.000908; Time: 52.2048s
+Test	DNABERT2	f1s: 0.9339	precision: 0.9364	recall: 0.9338	accuracy: 0.9338	mcc: 0.9285	 ; Time: 6.5286s
+Epoch: 23
+Train	Loss: 0.038108; Time: 52.0405s
+Test	DNABERT2	f1s: 0.9228	precision: 0.9275	recall: 0.9238	accuracy: 0.9238	mcc: 0.9179	 ; Time: 6.4700s
+Epoch: 24
+Train	Loss: 0.021669; Time: 52.0255s
+Test	DNABERT2	f1s: 0.9329	precision: 0.9343	recall: 0.9346	accuracy: 0.9346	mcc: 0.9294	 ; Time: 6.4925s
+Epoch: 25
+Train	Loss: 0.265139; Time: 51.9537s
+Test	DNABERT2	f1s: 0.9158	precision: 0.9263	recall: 0.9150	accuracy: 0.9150	mcc: 0.9088	 ; Time: 6.5376s
+Epoch: 26
+Train	Loss: 0.018237; Time: 52.0301s
+Test	DNABERT2	f1s: 0.9235	precision: 0.9281	recall: 0.9246	accuracy: 0.9246	mcc: 0.9189	 ; Time: 6.5005s
+Epoch: 27
+Train	Loss: 0.087466; Time: 52.0593s
+Test	DNABERT2	f1s: 0.9339	precision: 0.9351	recall: 0.9346	accuracy: 0.9346	mcc: 0.9293	 ; Time: 6.5251s
+Epoch: 28
+Train	Loss: 0.007862; Time: 52.0072s
+Test	DNABERT2	f1s: 0.9126	precision: 0.9239	recall: 0.9127	accuracy: 0.9127	mcc: 0.9065	 ; Time: 6.5114s
+Epoch: 29
+Train	Loss: 0.052469; Time: 51.9700s
+Test	DNABERT2	f1s: 0.9241	precision: 0.9294	recall: 0.9250	accuracy: 0.9250	mcc: 0.9193	 ; Time: 6.4478s
+NucleotideTransformer
+Trainable parameters: 494147038
+Epoch: 0
+Train	Loss: 0.861570; Time: 93.6241s
+Test	NucleotideTransformer	f1s: 0.7011	precision: 0.7299	recall: 0.7123	accuracy: 0.7123	mcc: 0.6905	 ; Time: 19.4498s
+Epoch: 1
+Train	Loss: 0.726123; Time: 94.7774s
+Test	NucleotideTransformer	f1s: 0.8190	precision: 0.8370	recall: 0.8204	accuracy: 0.8204	mcc: 0.8068	 ; Time: 19.6327s
+Epoch: 2
+Train	Loss: 0.367369; Time: 95.2848s
+Test	NucleotideTransformer	f1s: 0.8665	precision: 0.8710	recall: 0.8654	accuracy: 0.8654	mcc: 0.8545	 ; Time: 19.6630s
+Epoch: 3
+Train	Loss: 0.342791; Time: 95.4047s
+Test	NucleotideTransformer	f1s: 0.8755	precision: 0.8783	recall: 0.8754	accuracy: 0.8754	mcc: 0.8652	 ; Time: 19.7134s
+Epoch: 4
+Train	Loss: 0.231552; Time: 95.4176s
+Test	NucleotideTransformer	f1s: 0.8845	precision: 0.8881	recall: 0.8835	accuracy: 0.8835	mcc: 0.8740	 ; Time: 19.5814s
+Epoch: 5
+Train	Loss: 0.139332; Time: 95.1511s
+Test	NucleotideTransformer	f1s: 0.8854	precision: 0.8891	recall: 0.8865	accuracy: 0.8865	mcc: 0.8775	 ; Time: 19.6724s
+Epoch: 6
+Train	Loss: 0.024830; Time: 95.4071s
+Test	NucleotideTransformer	f1s: 0.8937	precision: 0.8976	recall: 0.8935	accuracy: 0.8935	mcc: 0.8849	 ; Time: 19.7229s
+Epoch: 7
+Train	Loss: 0.024753; Time: 95.5132s
+Test	NucleotideTransformer	f1s: 0.9062	precision: 0.9074	recall: 0.9065	accuracy: 0.9065	mcc: 0.8989	 ; Time: 19.6170s
+Epoch: 8
+Train	Loss: 0.006176; Time: 95.3693s
+Test	NucleotideTransformer	f1s: 0.9039	precision: 0.9052	recall: 0.9042	accuracy: 0.9042	mcc: 0.8964	 ; Time: 19.7154s
+Epoch: 9
+Train	Loss: 0.009063; Time: 95.5219s
+Test	NucleotideTransformer	f1s: 0.9045	precision: 0.9059	recall: 0.9050	accuracy: 0.9050	mcc: 0.8972	 ; Time: 19.8693s
+Epoch: 10
+Train	Loss: 0.007456; Time: 95.1430s
+Test	NucleotideTransformer	f1s: 0.9023	precision: 0.9036	recall: 0.9031	accuracy: 0.9031	mcc: 0.8952	 ; Time: 19.7007s
+Epoch: 11
+Train	Loss: 0.005225; Time: 95.0088s
+Test	NucleotideTransformer	f1s: 0.9031	precision: 0.9046	recall: 0.9035	accuracy: 0.9035	mcc: 0.8956	 ; Time: 19.6849s
+Epoch: 12
+Train	Loss: 0.002943; Time: 95.4671s
+Test	NucleotideTransformer	f1s: 0.9023	precision: 0.9038	recall: 0.9027	accuracy: 0.9027	mcc: 0.8948	 ; Time: 19.7821s
+Epoch: 13
+Train	Loss: 0.001797; Time: 95.6550s
+Test	NucleotideTransformer	f1s: 0.9011	precision: 0.9028	recall: 0.9015	accuracy: 0.9015	mcc: 0.8935	 ; Time: 19.6541s
+Epoch: 14
+Train	Loss: 0.001757; Time: 95.3069s
+Test	NucleotideTransformer	f1s: 0.9001	precision: 0.9019	recall: 0.9008	accuracy: 0.9008	mcc: 0.8927	 ; Time: 19.6710s
+Epoch: 15
+Train	Loss: 0.001580; Time: 95.6701s
+Test	NucleotideTransformer	f1s: 0.9018	precision: 0.9029	recall: 0.9023	accuracy: 0.9023	mcc: 0.8943	 ; Time: 19.8040s
+Epoch: 16
+Train	Loss: 0.002213; Time: 95.5369s
+Test	NucleotideTransformer	f1s: 0.8992	precision: 0.9009	recall: 0.8996	accuracy: 0.8996	mcc: 0.8914	 ; Time: 19.7145s
+Epoch: 17
+Train	Loss: 0.001050; Time: 95.7631s
+Test	NucleotideTransformer	f1s: 0.9018	precision: 0.9030	recall: 0.9023	accuracy: 0.9023	mcc: 0.8943	 ; Time: 19.7411s
+Epoch: 18
+Train	Loss: 0.001120; Time: 95.4066s
+Test	NucleotideTransformer	f1s: 0.8989	precision: 0.9008	recall: 0.8996	accuracy: 0.8996	mcc: 0.8915	 ; Time: 19.6837s
+Epoch: 19
+Train	Loss: 0.000842; Time: 95.2341s
+Test	NucleotideTransformer	f1s: 0.8994	precision: 0.9010	recall: 0.9000	accuracy: 0.9000	mcc: 0.8919	 ; Time: 19.6541s
+Epoch: 20
+Train	Loss: 0.000888; Time: 95.2523s
+Test	NucleotideTransformer	f1s: 0.9009	precision: 0.9025	recall: 0.9015	accuracy: 0.9015	mcc: 0.8935	 ; Time: 19.6664s
+Epoch: 21
+Train	Loss: 0.000825; Time: 95.3073s
+Test	NucleotideTransformer	f1s: 0.9010	precision: 0.9027	recall: 0.9015	accuracy: 0.9015	mcc: 0.8935	 ; Time: 19.7110s
+Epoch: 22
+Train	Loss: 0.000525; Time: 95.5281s
+Test	NucleotideTransformer	f1s: 0.9015	precision: 0.9031	recall: 0.9019	accuracy: 0.9019	mcc: 0.8939	 ; Time: 19.7215s
+Epoch: 23
+Train	Loss: 0.000442; Time: 95.5142s
+Test	NucleotideTransformer	f1s: 0.9012	precision: 0.9025	recall: 0.9019	accuracy: 0.9019	mcc: 0.8939	 ; Time: 19.6874s
+Epoch: 24
+Train	Loss: 0.000658; Time: 95.8164s
+Test	NucleotideTransformer	f1s: 0.8990	precision: 0.9009	recall: 0.8996	accuracy: 0.8996	mcc: 0.8915	 ; Time: 19.7149s
+Epoch: 25
+Train	Loss: 0.000438; Time: 95.9963s
+Test	NucleotideTransformer	f1s: 0.9022	precision: 0.9039	recall: 0.9027	accuracy: 0.9027	mcc: 0.8948	 ; Time: 19.6563s
+Epoch: 26
+Train	Loss: 0.000539; Time: 95.3436s
+Test	NucleotideTransformer	f1s: 0.9025	precision: 0.9037	recall: 0.9031	accuracy: 0.9031	mcc: 0.8952	 ; Time: 19.7846s
+Epoch: 27
+Train	Loss: 0.000331; Time: 95.4084s
+Test	NucleotideTransformer	f1s: 0.9012	precision: 0.9026	recall: 0.9019	accuracy: 0.9019	mcc: 0.8939	 ; Time: 19.6249s
+Epoch: 28
+Train	Loss: 0.000300; Time: 95.4529s
+Test	NucleotideTransformer	f1s: 0.9002	precision: 0.9020	recall: 0.9008	accuracy: 0.9008	mcc: 0.8927	 ; Time: 19.7538s
+Epoch: 29
+Train	Loss: 0.000152; Time: 95.5928s
+Test	NucleotideTransformer	f1s: 0.8997	precision: 0.9013	recall: 0.9004	accuracy: 0.9004	mcc: 0.8923	 ; Time: 19.7013s

@@ -1,9 +1,10 @@
 # A data maker for m6a data.
 
-# 原始数据包含来自miCLIP-Seq和来自m6A-Seq数据的两部分
+# The original data was from:
 # https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-018-2516-4#Tab1
 
-# 原始数据中，每条序列的长度为101bp，可能不适合需要长序列输入的模型。因此，使用data_maker创建101bp长度和509bp长度的序列数据，分别用作测试
+# In the original data, each sequence is 101bp in length, which may not be suitable for models requiring longer sequences.
+# Therefore, data_maker is used to create sequence data of 101bp and 509bp lengths, respectively, for testing purposes.
 
 import os
 import argparse
