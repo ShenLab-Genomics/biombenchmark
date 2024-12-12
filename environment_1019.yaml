@@ -1,4 +1,4 @@
-name: /public/home/shenninggroup/yny/code/AF/miniconda3/envs/biobench
+name: biombenchmark
 channels:
   - https://mirrors.zju.edu.cn/anaconda/pkgs/main
   - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free
@@ -184,4 +184,4 @@ dependencies:
       - wrapt==1.16.0
       - yarl==1.9.4
       - zipp==3.19.2
-prefix: /public/home/shenninggroup/yny/code/AF/miniconda3/envs/biobench
+prefix: biombenchmark
