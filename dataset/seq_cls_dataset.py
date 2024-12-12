@@ -28,3 +28,14 @@ class SeqClsDataset(Dataset):
 
     def __len__(self):
         return len(self.data)
+
+
+if __name__ == '__main__':
+    data = SeqClsDataset("seq_cls_data", "nRC", train=False)
+    max_len = 0
+    min_len = 1000000
+    for i in range(data.__len__()):
+        seq = data[i]['seq']
+        max_len = max(max_len, len(seq))
+        min_len = min(min_len, len(seq))
+    print(min_len, max_len)

@@ -14,10 +14,9 @@ MAX_SEQ_LEN = {"RNABERT": 102,
                "SpliceBERT": 102,
                "RNAErnie": 102,
                "DeepM6A": 102,
-               "UTRLM": 102,
                "ResNet": 102,
                'Optimus': 101,
-               'NucleotideTransformer': 101,
+               'NucleotideTransformer': 25,
                }
 
 
@@ -37,7 +36,7 @@ if __name__ == '__main__':
         description='')
 
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'RNABERT', 'UTRLM', 'ResNet', 'Optimus','NucleotideTransformer'], default='RNABERT')
+        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'RNABERT', 'ResNet', 'Optimus','NucleotideTransformer'], default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
