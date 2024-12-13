@@ -11,7 +11,7 @@ The pretrained model can be downloaded from the following link:
 `https://proj.cse.cuhk.edu.hk/rnafm/api/download?filename=RNA-FM_pretrained.pth`
 
 **RNABERT** and **RNAMSM**:
-Training data can be downloaded from [Google Drive](https://drive.google.com/drive/folders/1flh2rXiMKIreHE2l4sbjMmwAqfURj4vv?usp=sharing). This link is referenced from [RNAErnie](https://github.com/CatIIIIIIII/RNAErnie_baselines/tree/main).
+Model weights can be downloaded from [Link](https://drive.google.com/file/d/10gJBl24OGQ_aZfxtj09dik0rrM4dOk_R/view?usp=sharing) and [Link](https://drive.google.com/file/d/1-Gl9LGjR_dmDfOARrIVvuOmb7w_tJvGA/view?usp=sharing). This link is referenced from [RNAErnie](https://github.com/CatIIIIIIII/RNAErnie_baselines/tree/main).
 
 
 **RNAErnie**:
