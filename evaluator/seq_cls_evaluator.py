@@ -9,6 +9,7 @@ from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
 from model.wrap_for_cls import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss, DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls, NTForSeqCls
+from model.warp_models import GENAForSeqCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
@@ -455,3 +456,13 @@ class NTEvaluator(SeqClsEvaluator):
         self.model.print_trainable_parameters()
         self.model = NTForSeqCls(self.model).to(self.device)
         print(self.model)
+
+
+class GENAEvaluator(SeqClsEvaluator):
+    def __init__(self, args, tokenizer=None):
+        super().__init__(tokenizer)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num, trust_remote_code=True,
+        )
+        self.model = GENAForSeqCls(self.model).to(self.device)
+        

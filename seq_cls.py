@@ -13,8 +13,11 @@ MAX_SEQ_LEN = {"RNABERT": 440,
                'DNABERT2': 512,
                "SpliceBERT": 512,
                "RNAErnie": 512,
+               "GENA-LM-base": 512,
+               "GENA-LM-base": 512,
                'NucleotideTransformer': 100,  # 6-mers
                }
+available_methods = MAX_SEQ_LEN.keys()
 
 
 def str2list(v):
@@ -32,7 +35,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='')
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNABERT', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'DNABERT2', 'NucleotideTransformer'], default='RNABERT')
+        "--method", choices=available_methods, default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -46,11 +49,14 @@ if __name__ == '__main__':
     parser.add_argument("--use_kmer", default=1, type=int)
     parser.add_argument("--pad_token_id", default=0, type=int)
     parser.add_argument("--dataset", type=str)
+    parser.add_argument("--data_group", type=str)
     parser.add_argument('--metrics', type=str2list,
                         default="F1s,Precision,Recall,Accuracy,Mcc",)  # optional: Emb
     parser.add_argument("--extract_emb", default=False)
 
     args = parser.parse_args()
+
+    assert args.output_dir, "output_dir is required."
 
     ###
     seed = 2024
@@ -63,8 +69,8 @@ if __name__ == '__main__':
     dataset_test = seq_cls_dataset.SeqClsDataset(
         fasta_dir=args.dataset, prefix='nRC', train=False)
 
+    args.max_seq_len = MAX_SEQ_LEN[args.method]
     if args.method == 'RNABERT':
-        args.max_seq_len = MAX_SEQ_LEN["RNABERT"]
         args.replace_T = True
         args.replace_U = False
         tokenizer = RNATokenizer(args.vocab_path)
@@ -73,7 +79,6 @@ if __name__ == '__main__':
         ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'RNAFM':
-        args.max_seq_len = MAX_SEQ_LEN["RNAFM"]
         args.replace_T = True
         args.replace_U = False
         tokenizer = RNATokenizer(args.vocab_path)
@@ -82,7 +87,6 @@ if __name__ == '__main__':
         ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'RNAMSM':
-        args.max_seq_len = MAX_SEQ_LEN["RNAMSM"]
         args.replace_T = True
         args.replace_U = False
         tokenizer = RNATokenizer(args.vocab_path)
@@ -91,7 +95,6 @@ if __name__ == '__main__':
         ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'DNABERT':
-        args.max_seq_len = MAX_SEQ_LEN["DNABERT"]
         args.replace_T = False
         args.replace_U = True
         tokenizer = AutoTokenizer.from_pretrained(
@@ -102,7 +105,6 @@ if __name__ == '__main__':
         ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'SpliceBERT':
-        args.max_seq_len = MAX_SEQ_LEN["SpliceBERT"]
         args.replace_T = False
         args.replace_U = True
         tokenizer = AutoTokenizer.from_pretrained(
@@ -113,7 +115,6 @@ if __name__ == '__main__':
         ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'RNAErnie':
-        args.max_seq_len = MAX_SEQ_LEN["RNAErnie"]
         args.replace_T = True
         args.replace_U = False
 
@@ -125,7 +126,6 @@ if __name__ == '__main__':
         ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'DNABERT2':
-        args.max_seq_len = MAX_SEQ_LEN["DNABERT2"]
         args.replace_T = False
         args.replace_U = True
         tokenizer = AutoTokenizer.from_pretrained(
@@ -136,12 +136,21 @@ if __name__ == '__main__':
         ev.run(args, dataset_train, dataset_test)
 
     if args.method == 'NucleotideTransformer':
-        args.max_seq_len = MAX_SEQ_LEN["NucleotideTransformer"]
         args.replace_T = False
         args.replace_U = True
         tokenizer = AutoTokenizer.from_pretrained(
             args.model_path)
 
         ev = seq_cls_evaluator.NTEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'GENA-LM-base' or args.method == 'GENA-LM-large':
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = seq_cls_evaluator.GENAEvaluator(
             args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
