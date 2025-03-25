@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, BertForSequenceClassification
 
 
 class ResBlock(nn.Module):
@@ -73,7 +73,7 @@ def create_1dcnn_for_emd(in_planes, out_planes):
     return emb_cnn
 
 
-class RNAFmWarp(nn.Module):
+class RNAFmWrap(nn.Module):
     def __init__(self, bert, hidden_size=640, freeze_backbone=False):
         super().__init__()
         self.bert = bert
@@ -87,7 +87,7 @@ class RNAFmWarp(nn.Module):
         self.load_state_dict(torch.load(path, map_location="cpu"), strict=True)
 
 
-class RNAFmForSeqCls(RNAFmWarp):
+class RNAFmForSeqCls(RNAFmWrap):
     def __init__(self, bert, hidden_size=640, class_num=13, freeze_backbone=False):
         super().__init__(bert, hidden_size, freeze_backbone)
         self.classifier = nn.Linear(hidden_size, class_num)
@@ -102,10 +102,10 @@ class RNAFmForSeqCls(RNAFmWarp):
         return logits
 
 
-class RNAFmForTokenCls(RNAFmWarp):
-    def __init__(self, bert, hidden_size=640, num_labels=3, freeze_backbone=False):
+class RNAFmForTokenCls(RNAFmWrap):
+    def __init__(self, bert, hidden_size=640, class_num=3, freeze_backbone=False):
         super().__init__(bert, hidden_size, freeze_backbone)
-        self.classifier = nn.Linear(hidden_size, num_labels)
+        self.classifier = nn.Linear(hidden_size, class_num)
         self.pad = 6  # 511 -> 500
 
     def forward(self, input_ids):
@@ -116,7 +116,7 @@ class RNAFmForTokenCls(RNAFmWarp):
         return logits
 
 
-class RNAFmForReg(RNAFmWarp):
+class RNAFmForReg(RNAFmWrap):
     def __init__(self, bert, hidden_size=640, freeze_backbone=False):
         super().__init__(bert, hidden_size, freeze_backbone)
         self.predictor = create_1dcnn_for_emd(640, 1)
@@ -132,20 +132,87 @@ class RNAFmForReg(RNAFmWarp):
 
 # -----------------
 
-class RNABertWarp(nn.Module):
+
+class RNAMsmWrap(nn.Module):
+    def __init__(self, bert, hidden_size=768, freeze_backbone=False):
+        super().__init__()
+        self.bert = bert
+        self.hidden_size = hidden_size
+        self.freeze_backbone = freeze_backbone
+        if freeze_backbone:
+            for param in self.bert.parameters():
+                param.requires_grad = False
+
+    def _load_pretrained_bert(self, path):
+        self.load_state_dict(torch.load(
+            path, map_location="cpu"), strict=False)
+
+    def forward_bert(self, input_ids):
+        # MSM use 1 as pad token, the attention mask is calculated automatically
+        output = self.bert(input_ids, repr_layers=[10])
+        return output
+
+
+class RNAMsmForSeqCls(RNAMsmWrap):
+    def __init__(self, bert, hidden_size=768, class_num=13, freeze_backbone=False):
+        super().__init__(bert, hidden_size, freeze_backbone)
+        self.classifier = nn.Linear(hidden_size, class_num)
+
+    def forward(self, input_ids):
+        representations = self.forward_bert(
+            input_ids)["representations"][10][:, 0, 0, :]
+        logits = self.classifier(representations)
+        return logits
+
+
+class RNAMsmForTokenCls(RNAMsmWrap):
+    def __init__(self, bert, hidden_size=768, class_num=3, freeze_backbone=False):
+        super().__init__(bert, hidden_size, freeze_backbone)
+        self.classifier = nn.Linear(hidden_size, class_num)
+        self.pad = 6  # 512 -> 500
+
+    def forward(self, input_ids):
+        representations = self.forward_bert(
+            input_ids)["representations"][10][:, 0, :, :]
+        logits = self.classifier(representations)
+        logits = logits[:, 1 + self.pad:-self.pad, :].transpose(1, 2)
+        return logits
+
+
+class RNAMsmForReg(RNAMsmWrap):
+    def __init__(self, bert, hidden_size=768, class_num=1, freeze_backbone=False):
+        super().__init__(bert, hidden_size, freeze_backbone)
+        self.predictor = create_1dcnn_for_emd(hidden_size, class_num)
+
+    def forward(self, input_ids):
+        representations = self.forward_bert(input_ids)["representations"][10][:, 0, :, :].transpose(
+            1, 2)
+        logits = self.predictor(representations).squeeze(-1)
+        return logits
+
+# -----------------
+
+
+class RNABertWrap(nn.Module):
     def __init__(self, bert, freeze_backbone=False):
         super().__init__()
         self.bert = bert
+        if freeze_backbone:
+            for param in self.bert.parameters():
+                param.requires_grad = False
 
     def _load_pretrained_bert(self, path):
-        self.load_state_dict(torch.load(path, map_location="cpu"), strict=False)
+        self.load_state_dict(torch.load(
+            path, map_location="cpu"), strict=False)
 
     def forward_bert(self, input_ids):
+        # RNABert uses 0 as pad token
         return self.bert(input_ids, attention_mask=input_ids > 0)
 
-class RNABertForSeqCls(RNABertWarp):
-    def __init__(self, bert, hidden_size=120, class_num=13):
-        super().__init__(bert)
+
+class RNABertForSeqCls(RNABertWrap):
+    def __init__(self, bert, hidden_size=120, class_num=13, freeze_backbone=False):
+        super().__init__(bert, freeze_backbone)
         self.classifier = nn.Linear(hidden_size, class_num)
 
     def forward(self, input_ids, return_embedding=False):
@@ -155,10 +222,11 @@ class RNABertForSeqCls(RNABertWarp):
         logits = self.classifier(pooled_output)
         return logits
 
-class RNABERTForTokenCls(RNABertWarp):
-    def __init__(self, bert, hidden_size=120, num_labels=3):
-        super().__init__(bert)
-        self.classifier = nn.Linear(hidden_size, num_labels)
+
+class RNABERTForTokenCls(RNABertWrap):
+    def __init__(self, bert, hidden_size=120, class_num=3, freeze_backbone=False):
+        super().__init__(bert, freeze_backbone)
+        self.classifier = nn.Linear(hidden_size, class_num)
         self.pad = (512 - 500) // 2
 
     def forward(self, input_ids):
@@ -167,10 +235,11 @@ class RNABERTForTokenCls(RNABertWarp):
         logits = output[:, 1 + self.pad:-self.pad, :].transpose(1, 2)
         return logits
 
-class RNABERTForReg(RNABertWarp):
-    def __init__(self, bert, hidden_size=120):
-        super().__init__(bert)
-        self.predictor = create_1dcnn_for_emd(hidden_size, 1)
+
+class RNABERTForReg(RNABertWrap):
+    def __init__(self, bert, hidden_size=120, class_num=1, freeze_backbone=False):
+        super().__init__(bert, freeze_backbone)
+        self.predictor = create_1dcnn_for_emd(hidden_size, class_num)
 
     def forward(self, input_ids):
         _, pooled_output = self.forward_bert(input_ids)
@@ -179,16 +248,18 @@ class RNABERTForReg(RNABertWarp):
 # -----------------
 
 
-class DNABERTWarp(nn.Module):
+class DNABERTWrap(nn.Module):
     def __init__(self, model, freeze_backbone=False):
         super().__init__()
         self.model = model
         self.freeze_backbone = freeze_backbone
         if freeze_backbone:
-            raise NotImplementedError
+            # Huggingface BertModel
+            for param in self.model.bert.parameters():
+                param.requires_grad = False
 
 
-class DNABERTForSeqCls(DNABERTWarp):
+class DNABERTForSeqCls(DNABERTWrap):
     def __init__(self, model, freeze_backbone=False):
         super().__init__(model, freeze_backbone)
 
@@ -197,28 +268,27 @@ class DNABERTForSeqCls(DNABERTWarp):
         return logits
 
 
-class DNABERTForTokenCls(DNABERTWarp):
+class DNABERTForTokenCls(DNABERTWrap):
     def __init__(self, model, freeze_backbone=False):
         super().__init__(model, freeze_backbone)
         self.pad = 6  # 512 -> 500
 
     def forward(self, input_ids):
         input_ids = input_ids[:, 1:]  # drop the first [CLS]
-        logits = self.model(input_ids).logits
+        logits = self.model(input_ids, attention_mask=input_ids > 0).logits
         logits = logits[:, self.pad:-self.pad, :].transpose(1, 2)
         return logits
 
 
-class DNABERTForReg(DNABERTWarp):
+class DNABERTForReg(DNABERTWrap):
     def __init__(self, model, freeze_backbone=False):
         super().__init__(model, freeze_backbone)
         self.predictor = create_1dcnn_for_emd(self.model.config.hidden_size, 1)
 
     def forward(self, input_ids):
         input_ids = input_ids[:, 1:]
-        with torch.no_grad():
-            logits = self.model(input_ids, attention_mask=input_ids > 0)[
-                'last_hidden_state']
+        logits = self.model(input_ids, attention_mask=input_ids > 0)[
+            'last_hidden_state']
         logits = self.predictor(logits.transpose(
             1, 2)).squeeze(-1)
         return logits
@@ -229,8 +299,10 @@ class DNABERTForReg(DNABERTWarp):
 class SpliceBERTForTokenCls(DNABERTForTokenCls):
     pass
 
+
 class SpliceBERTForSeqCls(DNABERTForSeqCls):
     pass
+
 
 class SpliceBERTForReg(DNABERTForReg):
     pass
@@ -238,21 +310,52 @@ class SpliceBERTForReg(DNABERTForReg):
 # -----------------
 
 
-
-# -----------------
-
-
-class GENAWarp(nn.Module):
+class DNABERT2Wrap(nn.Module):
     def __init__(self, model, freeze_backbone=False):
         super().__init__()
         self.model = model
         self.freeze_backbone = freeze_backbone
         if freeze_backbone:
-            raise NotImplementedError
+            for param in self.model.bert.parameters():
+                param.requires_grad = False
 
 
-class GENAForSeqCls(GENAWarp):
+class DNABERT2ForSeqCls(DNABERT2Wrap):
     def __init__(self, model, freeze_backbone=False):
+        super().__init__(model, freeze_backbone)
+
+    def forward(self, input_ids):
+        # DNABERT2 use 3 as pad token
+        logits = self.model(input_ids, attention_mask=input_ids != 3).logits
+        return logits
+
+
+class DNABERT2ForReg(DNABERT2Wrap):
+    def __init__(self, model, freeze_backbone=False):
+        super().__init__(model, freeze_backbone)
+        self.predictor = create_1dcnn_for_emd(768, 1)
+
+    def forward(self, input_ids):
+        input_ids = input_ids[:, 1:]
+        logits = self.model(input_ids, attention_mask=input_ids != 3)[0]
+        logits = self.predictor(logits.transpose(1, 2)).squeeze(-1)
+        return logits
+
+# -----------------
+
+
+class RNAErnieWrap(nn.Module):
+    def __init__(self, model, freeze_backbone=False):
+        super().__init__()
+        self.model = model
+        self.freeze_backbone = freeze_backbone
+        if freeze_backbone:
+            for param in self.model.bert.parameters():
+                param.requires_grad = False
+
+
+class RNAErnieForSeqCls(RNAErnieWrap):
+    def __init__(self, model, freeze_backbone=False) -> None:
         super().__init__(model, freeze_backbone)
 
     def forward(self, input_ids):
@@ -260,27 +363,144 @@ class GENAForSeqCls(GENAWarp):
         return logits
 
 
-class GENAForTokenCls(GENAWarp):
+class RNAErnieForTokenCls(RNAErnieWrap):
+    def __init__(self, model, freeze_backbone=False) -> None:
+        super().__init__(model, freeze_backbone)
+        self.pad = (510 - 500) // 2
+
+    def forward(self, input_ids):
+        input_ids = input_ids[:, 1:-1]  # drop the first [CLS]
+        logits = self.model(input_ids, attention_mask=input_ids > 0).logits
+        logits = logits[:, self.pad:-self.pad, :].transpose(1, 2)
+        return logits
+
+
+class RNAErnieForReg(RNAErnieWrap):
+    def __init__(self, model, freeze_backbone=False):
+        super().__init__(model, freeze_backbone)
+        self.predictor = create_1dcnn_for_emd(768, 1)
+
+    def forward(self, input_ids):
+        logits = self.model(input_ids, attention_mask=input_ids > 0)[
+            'last_hidden_state']
+        logits = self.predictor(logits.transpose(
+            1, 2)).squeeze(-1)
+        return logits
+
+# -----------------
+
+
+class NucleotideTransformerWrap(nn.Module):
+    def __init__(self, model, freeze_backbone=False):
+        super().__init__()
+        self.model = model
+        self.freeze_backbone = freeze_backbone
+        if freeze_backbone:
+            for param in self.model.bert.parameters():
+                param.requires_grad = False
+
+
+class NTForSeqCls(NucleotideTransformerWrap):
+    def __init__(self, model, freeze_backbone=False):
+        super().__init__(model, freeze_backbone)
+
+    def forward(self, input_ids):
+        logits = self.model(input_ids, attention_mask=input_ids > 1).logits
+        return logits
+
+
+class NTForTokenCls(NucleotideTransformerWrap):
+    def __init__(self, model, class_num=3, freeze_backbone=False):
+        super().__init__(model, freeze_backbone)
+        self.class_num = class_num
+        self.classifier = nn.Linear(1024, 6 * class_num)
+        # according to the paper, each classifier head predicts 6 continental positions
+        self.pad = (9000 - 500) // 2
+
+    def forward(self, input_ids):
+        input_ids = input_ids[:, 1:]
+        torch_outs = self.model(
+            input_ids, attention_mask=input_ids > 1, output_hidden_states=True)
+        logits = torch_outs['hidden_states'][-1]
+        logits = self.classifier(logits)
+
+        batch = logits.shape[0]
+        logits = logits.reshape(batch, -1, self.class_num)
+        logits = logits[:, self.pad:-self.pad, :].transpose(1, 2)
+        return logits
+
+
+class NTForReg(NucleotideTransformerWrap):
+    def __init__(self, model, class_num=3, freeze_backbone=False):
+        super().__init__(model, freeze_backbone)
+        self.predictor = create_1dcnn_for_emd(1024, class_num)
+
+    def forward(self, input_ids):
+        input_ids = input_ids[:, 1:]
+        torch_outs = self.model(
+            input_ids, attention_mask=input_ids > 1, output_hidden_states=True)
+        logits = torch_outs['hidden_states'][-1]
+        logits = self.predictor(logits.transpose(
+            1, 2)).squeeze(-1)
+        return logits
+
+# -----------------
+
+
+class GENAWrap(nn.Module):
+    def __init__(self, model, freeze_backbone=False):
+        super().__init__()
+        self.model = model
+        self.freeze_backbone = freeze_backbone
+        if freeze_backbone:
+            raise NotImplementedError
+
+    def forward_model(self, input_ids):
+        return self.model(input_ids, attention_mask=input_ids != 3)
+
+
+class GENAForSeqCls(GENAWrap):
+    def __init__(self, model, freeze_backbone=False):
+        super().__init__(model, freeze_backbone)
+
+    def forward(self, input_ids):
+        logits = self.forward_model(input_ids).logits
+        return logits
+
+
+class GENAForTokenCls(GENAWrap):
     def __init__(self, model, freeze_backbone=False):
         super().__init__(model, freeze_backbone)
         self.pad = 6  # 512 -> 500
 
     def forward(self, input_ids):
-        logits = self.model(input_ids).logits
+        logits = self.forward_model(input_ids).logits
         logits = logits[:, self.pad:-self.pad, :].transpose(1, 2)
         return logits
 
 
-class GENAForReg(GENAWarp):
+class GENAForReg(GENAWrap):
     def __init__(self, model, freeze_backbone=False):
         super().__init__(model, freeze_backbone)
         self.predictor = create_1dcnn_for_emd(self.model.config.hidden_size, 1)
 
     def forward(self, input_ids):
-        input_ids = input_ids[:, 1:]
-        with torch.no_grad():
-            logits = self.model(input_ids, attention_mask=input_ids > 0)[
-                'last_hidden_state']
-        logits = self.predictor(logits.transpose(
-            1, 2)).squeeze(-1)
+        logits = self.forward_model(input_ids).logits
+        logits = self.predictor(logits.transpose(1, 2)).squeeze(-1)
         return logits
+
+
+class UTRLMWrap(nn.Module):
+    pass
+
+
+class UTRLMForSeqCls(UTRLMWrap):
+    pass
+
+
+class UTRLMForTokenCls(UTRLMWrap):
+    pass
+
+
+class UTRLMForReg(UTRLMWrap):
+    pass
