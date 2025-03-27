@@ -9,7 +9,8 @@ from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 from model.bCNNMethylpred import bcnn
 import model.RNAFM.fm as fm
-from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForSeqCls, DNABERT2ForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss,NTForSeqCls
+# from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForSeqCls, DNABERT2ForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss,NTForSeqCls
+from model import wrap_models
 import model.DeepM6ASeq
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -374,3 +375,36 @@ class NTEvaluator(M6APredEvaluator):
         )
         self.model = get_peft_model(self.model, peft_config)
         self.model = NTForSeqCls(self.model).to(self.device)
+
+
+class GENAEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            args.model_path, num_labels=2
+        )
+
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+
+        self.model = GENAForSeqCls(self.model).to(self.device)
+
+
+class UTRLMEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        from model.UTRLM.utrlm import UTRLM
+        super().__init__(tokenizer=tokenizer)
+        self.model = UTRLM()
+        # load model weights
+        model_weights = torch.load(
+            args.model_path, map_location=torch.device('cpu'))
+        self.model.load_state_dict(
+            {k.replace('module.', ''): v for k, v in model_weights.items()}, strict=True)
+
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+        self.model = wrap_models.UTRLMForSeqCls(self.model).to(self.device)
