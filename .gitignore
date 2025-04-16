@@ -161,3 +161,6 @@ cython_debug/
 
 
 logs/*
+analyzer/figures/
+analyzer/figures_backup/
+analyzer/tables/
