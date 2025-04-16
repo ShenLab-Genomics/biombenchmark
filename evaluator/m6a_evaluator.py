@@ -9,6 +9,7 @@ from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 from model.bCNNMethylpred import bcnn
 import model.RNAFM.fm as fm
+from model.GENA import modeling_bert as GENA
 # from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForSeqCls, DNABERT2ForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss,NTForSeqCls
 from model import wrap_models
 import model.DeepM6ASeq
@@ -181,7 +182,16 @@ class M6APredEvaluator():
         for i_epoch in range(args.num_train_epochs):
             print("Epoch: {}".format(i_epoch))
             self.seq_cls_trainer.train(i_epoch)
+            # record performance on train set to check overfitting
+            self.seq_cls_trainer.eval(i_epoch, info="Train_set")
             self.seq_cls_trainer.eval(i_epoch)
+            if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
+                try:
+                    self.seq_cls_trainer.save_model(
+                        args.output_dir, i_epoch)
+                except Exception as e:
+                    print(e)
+                    print("Failed to save model.")
 
 
 #### Evaluator for models ####
@@ -190,7 +200,7 @@ class RNAFMEvaluator(M6APredEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
         self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
-        self.model = RNAFmForSeqCls(self.model, class_num=2)
+        self.model = wrap_models.RNAFmForSeqCls(self.model, class_num=2)
         self.model.to(self.device)
 
 
@@ -199,7 +209,7 @@ class RNAMsmEvaluator(M6APredEvaluator):
         super().__init__(tokenizer=tokenizer)
         model_config = get_config(args.model_config)
         self.model = MSATransformer(**model_config)
-        self.model = RNAMsmForSeqCls(self.model, class_num=2)
+        self.model = wrap_models.RNAMsmForSeqCls(self.model, class_num=2)
         self.model._load_pretrained_bert(
             args.model_path)
         self.model.to(self.device)
@@ -211,7 +221,7 @@ class RNABertEvaluator(M6APredEvaluator):
         # ========== Build tokenizer, model, criterion
         model_config = get_config(args.model_config)
         self.model = BertModel(model_config)
-        self.model = RNABertForSeqCls(self.model, class_num=2)
+        self.model = wrap_models.RNABertForSeqCls(self.model, class_num=2)
         if args.model_path:
             self.model._load_pretrained_bert(args.model_path)
         else:
@@ -224,7 +234,7 @@ class DNABERTEvaluator(M6APredEvaluator):
         super().__init__(tokenizer=tokenizer)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=2).to(self.device)
-        self.model = DNABERTForSeqCls(self.model)
+        self.model = wrap_models.DNABERTForSeqCls(self.model)
 
 
 class DNABERT2Evaluator(M6APredEvaluator):
@@ -234,7 +244,7 @@ class DNABERT2Evaluator(M6APredEvaluator):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=2, trust_remote_code=True,
         )
-        self.model = DNABERT2ForSeqCls(self.model).to(self.device)
+        self.model = wrap_models.DNABERT2ForSeqCls(self.model).to(self.device)
 
 
 class SpliceBERTEvaluator(DNABERTEvaluator):
@@ -249,7 +259,7 @@ class RNAErnieEvaluator(M6APredEvaluator):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=args.class_num
         )
-        self.model = RNAErnieForSeqCls(
+        self.model = wrap_models.RNAErnieForSeqCls(
             self.model).to(self.device)
 
 
@@ -364,32 +374,32 @@ class NTEvaluator(M6APredEvaluator):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=2, trust_remote_code=True,
         )
-        trainable_params = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
-        print("Trainable parameters: {}".format(trainable_params))
+        # trainable_params = sum(
+        #     p.numel() for p in self.model.parameters() if p.requires_grad
+        # )
+        # print("Trainable parameters: {}".format(trainable_params))
 
         peft_config = LoraConfig(
             task_type=TaskType.SEQ_CLS, inference_mode=False, r=1, lora_alpha=32, lora_dropout=0.1,
             target_modules=["query", "value"]
         )
         self.model = get_peft_model(self.model, peft_config)
-        self.model = NTForSeqCls(self.model).to(self.device)
+        self.model = wrap_models.NTForSeqCls(self.model).to(self.device)
 
 
 class GENAEvaluator(M6APredEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_path, num_labels=2
+        self.model = GENA.BertForSequenceClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num,
         )
 
-        trainable_params = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
-        print("Trainable parameters: {}".format(trainable_params))
+        # trainable_params = sum(
+        #     p.numel() for p in self.model.parameters() if p.requires_grad
+        # )
+        # print("Trainable parameters: {}".format(trainable_params))
 
-        self.model = GENAForSeqCls(self.model).to(self.device)
+        self.model = wrap_models.GENAForSeqCls(self.model).to(self.device)
 
 
 class UTRLMEvaluator(M6APredEvaluator):
@@ -403,8 +413,9 @@ class UTRLMEvaluator(M6APredEvaluator):
         self.model.load_state_dict(
             {k.replace('module.', ''): v for k, v in model_weights.items()}, strict=True)
 
-        trainable_params = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
-        print("Trainable parameters: {}".format(trainable_params))
-        self.model = wrap_models.UTRLMForSeqCls(self.model).to(self.device)
+        # trainable_params = sum(
+        #     p.numel() for p in self.model.parameters() if p.requires_grad
+        # )
+        # print("Trainable parameters: {}".format(trainable_params))
+        self.model = wrap_models.UTRLMForSeqCls(
+            self.model, class_num=2).to(self.device)

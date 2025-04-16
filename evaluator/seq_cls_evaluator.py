@@ -9,9 +9,10 @@ from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
 from model.wrap_for_cls import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss, DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls, NTForSeqCls
-from model.warp_models import GENAForSeqCls
+from model.wrap_models import GENAForSeqCls
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from model.GENA import modeling_bert as GENA
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
 from sklearn.metrics import (
     roc_curve,
@@ -210,13 +211,77 @@ class SeqClsCollator(BaseCollator):
             "labels": torch.from_numpy(self.stack_fn(labels_stack))}
 
 
+class SeqClsOneHotCollator(BaseCollator):
+    IN_MAP = np.asarray([[0, 0, 0, 0],
+                         [1, 0, 0, 0],
+                         [0, 1, 0, 0],
+                         [0, 0, 1, 0],
+                         [0, 0, 0, 1]])
+    # One-hot encoding of the inputs: 0 is for padding, and 1, 2, 3, 4 correspond
+    # to A, C, G, T respectively.
+
+    IN_MAP_SS = np.asarray([[1, 0, 0],
+                            [0, 1, 0],
+                            [0, 0, 1]])
+
+    char_map = {
+        'N': 0,
+        'A': 1,
+        'C': 2,
+        'G': 3,
+        'T': 4,
+        '.': 0,
+        '(': 1,
+        ')': 2
+    }
+
+    @staticmethod
+    def one_hot_encode(X, use_map):
+        return use_map[X.astype('int8')]
+
+    def __init__(self, max_seq_len, tokenizer, replace_T=True, replace_U=False, use_kmer=True, overflow=0):
+        super().__init__()
+        self.max_seq_len = max_seq_len
+        self.tokenizer = tokenizer
+        assert replace_U, "Only use ACGT."
+
+    def __call__(self, raw_data):
+        input_ids_stack = []
+        labels_stack = []
+        for data in raw_data:
+            seq = data[0]
+            seq = seq.upper()
+            seq = seq.replace("U", "T")
+            seq = np.array([self.char_map[x] for x in seq])
+            input_ids = self.one_hot_encode(seq, self.IN_MAP)
+
+            if len(data) == 3:
+                # one-hot encoding of the secondary structure
+                ss = data[2]
+                ss = np.array([self.char_map[x] for x in ss])
+                ss = self.one_hot_encode(ss, self.IN_MAP_SS)
+                input_ids = np.concatenate([input_ids, ss], axis=0)
+
+            # padding to max_seq_len with zero
+            if len(input_ids) < self.max_seq_len:
+                input_ids = np.concatenate([input_ids, np.zeros(
+                    (self.max_seq_len - len(input_ids), input_ids.shape[1]))], axis=0)
+            if len(input_ids) > self.max_seq_len:
+                input_ids = input_ids[:self.max_seq_len]
+
+            labels_stack.append(data[1])
+        return {
+            "input_ids": torch.from_numpy(self.stack_fn(input_ids_stack)).transpose(1, 2),
+            "labels": torch.from_numpy(self.stack_fn(labels_stack))}
+
+
 class SeqClsTrainer(BaseTrainer):
     def train(self, epoch):
         self.model.train()
         time_st = time.time()
         num_total, loss_total = 0, 0
 
-        with tqdm(total=len(self.train_dataset)) as pbar:
+        with tqdm(total=len(self.train_dataset), mininterval=5) as pbar:
             for i, data in enumerate(self.train_dataloader):
                 input_ids = data["input_ids"].to(self.args.device)
                 labels = data["labels"].to(self.args.device)
@@ -245,13 +310,18 @@ class SeqClsTrainer(BaseTrainer):
         print('Train\tLoss: {:.6f}; Time: {:.4f}s'.format(
             loss.item(), time_ed))
 
-    def eval(self, epoch):
+    def eval(self, epoch, info="Test_set"):
         self.model.eval()
         time_st = time.time()
         num_total = 0
-        with tqdm(total=len(self.eval_dataset)) as pbar:
+
+        target_dataloader = self.eval_dataloader
+        if info == "Train_set":
+            target_dataloader = self.train_dataloader
+
+        with tqdm(total=len(target_dataloader.dataset)) as pbar:
             outputs_dataset, labels_dataset = [], []
-            for i, data in enumerate(self.eval_dataloader):
+            for i, data in enumerate(target_dataloader):
                 input_ids = data["input_ids"].to(self.args.device)
                 labels = data["labels"].to(self.args.device)
 
@@ -274,7 +344,7 @@ class SeqClsTrainer(BaseTrainer):
 
         # log results to screen/bash
         results = {}
-        log = 'Test\t' + self.args.method + "\t"
+        log = 'Test\t' + self.args.method + "\t" + info + "\t"
         # log results to visualdl
         tag_value = defaultdict(float)
         # extract results
@@ -366,7 +436,16 @@ class SeqClsEvaluator:
                 seq_cls_trainer.extract_embedding(i_epoch)
             print("Epoch: {}".format(i_epoch))
             seq_cls_trainer.train(i_epoch)
+            # record performance on train set to check overfitting
+            seq_cls_trainer.eval(i_epoch, info="Train_set")
             seq_cls_trainer.eval(i_epoch)
+            if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
+                try:
+                    seq_cls_trainer.save_model(
+                        args.output_dir, i_epoch)
+                except Exception as e:
+                    print(e)
+                    print("Failed to save model.")
 
 
 class RNABertEvaluator(SeqClsEvaluator):
@@ -461,8 +540,8 @@ class NTEvaluator(SeqClsEvaluator):
 class GENAEvaluator(SeqClsEvaluator):
     def __init__(self, args, tokenizer=None):
         super().__init__(tokenizer)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            args.model_path, num_labels=args.class_num, trust_remote_code=True,
+        # a special hack
+        self.model = GENA.BertForSequenceClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num,
         )
         self.model = GENAForSeqCls(self.model).to(self.device)
-        

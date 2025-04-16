@@ -9,14 +9,18 @@ import torch
 MAX_SEQ_LEN = {"RNABERT": 440,
                "RNAMSM": 512,
                "RNAFM": 512,
-               'DNABERT': 512,
-               'DNABERT2': 512,
+               "DNABERT": 512,
+               "DNABERT2": 512,
                "SpliceBERT": 512,
                "RNAErnie": 512,
+               "NucleotideTransformer": 100,
+               "GENA-LM-base": 512//4,
+               "GENA-LM-large": 512//4,
+               "UTRLM": 512,
                "DeepM6A": 101,
                "bCNNMethylpred": 101,
-               'NucleotideTransformer': 100
                }
+available_methods = MAX_SEQ_LEN.keys()
 
 
 def str2list(v):
@@ -35,7 +39,7 @@ if __name__ == '__main__':
         description='')
 
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'DeepM6A', 'RNABERT', 'bCNNMethylpred', 'NucleotideTransformer'], default='RNABERT')
+        "--method", choices=available_methods, default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -67,7 +71,7 @@ if __name__ == '__main__':
     if ('101bp' in args.dataset_train) and (MAX_SEQ_LEN[args.method] > 103):
         MAX_SEQ_LEN[args.method] = 103
 
-    if ('101bp' in args.dataset_train) and (args.method=='NucleotideTransformer'):
+    if ('101bp' in args.dataset_train) and (args.method == 'NucleotideTransformer'):
         MAX_SEQ_LEN[args.method] = 25
     ##
 
@@ -136,6 +140,28 @@ if __name__ == '__main__':
             args, tokenizer=tokenizer)  # load tokenizer from model
         ev.run(args, dataset_train, dataset_test)
 
+    if args.method == 'NucleotideTransformer':
+        args.max_seq_len = MAX_SEQ_LEN["NucleotideTransformer"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = m6a_evaluator.NTEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'GENA-LM-base' or args.method == 'GENA-LM-large':
+        args.max_seq_len = MAX_SEQ_LEN[args.method]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = m6a_evaluator.GENAEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
     if args.method == 'DeepM6A':
         args.replace_T = False
         args.replace_U = True
@@ -152,13 +178,12 @@ if __name__ == '__main__':
         ev = m6a_evaluator.bCNNEvaluator(args, tokenizer=None)
         ev.run(args, dataset_train, dataset_test)
 
-    if args.method == 'NucleotideTransformer':
-        args.max_seq_len = MAX_SEQ_LEN["NucleotideTransformer"]
+    if args.method == 'UTRLM':
+        args.max_seq_len = MAX_SEQ_LEN["UTRLM"]
         args.replace_T = False
         args.replace_U = True
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.model_path)
+        tokenizer = RNATokenizer(args.vocab_path)
 
-        ev = m6a_evaluator.NTEvaluator(
+        ev = m6a_evaluator.UTRLMEvaluator(
             args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
