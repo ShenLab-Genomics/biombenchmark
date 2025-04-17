@@ -188,7 +188,7 @@ class M6APredEvaluator():
             if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
                 try:
                     self.seq_cls_trainer.save_model(
-                        args.output_dir, i_epoch)
+                        f'{args.output_dir}/{args.method}', i_epoch)
                 except Exception as e:
                     print(e)
                     print("Failed to save model.")

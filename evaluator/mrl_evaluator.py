@@ -1,24 +1,21 @@
 import torch
-import numpy as np
-from torch import nn
 import torch.nn.functional as F
+from torch.optim import AdamW
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel, AutoModelForMaskedLM
+from transformers.models.bert.configuration_bert import BertConfig
+import numpy as np
 from tqdm import tqdm
-import time
+from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
+from evaluator.base_evaluator import BaseMetrics
+from evaluator.seq_cls_evaluator import SeqClsTrainer, SeqClsCollator, SeqClsEvaluator, seq2kmer
+# from model.wrap_for_mrl import RNAFmForReg, RNAErnieForReg, PureReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus, NTForReg, RNAErnieForRegAB
+import model.RNAFM.fm as fm
 from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
-from sklearn.metrics import root_mean_squared_error, mean_absolute_error, r2_score
-from collections import defaultdict
-from evaluator.base_evaluator import BaseMetrics
-from evaluator.seq_cls_evaluator import SeqClsTrainer, SeqClsCollator, SeqClsEvaluator, seq2kmer
-import model.RNAFM.fm as fm
-from model.wrap_for_cls import DNABERTForSeqCls
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModel, AutoModelForMaskedLM
-from torch.optim import AdamW
-from model.wrap_for_mrl import RNAFmForReg, RNAErnieForReg, PureReg, RNAMsmForReg, RNABERTForReg, weights_init, DNABERT2ForReg, DNABERTForReg, Optimus, NTForReg
+from model.GENA import modeling_bert as GENA
+from model import wrap_models, wrap_for_mrl
 import scipy.stats as stats
-from sklearn import preprocessing
-from transformers.models.bert.configuration_bert import BertConfig
 
 
 class MRLMetrics(BaseMetrics):
@@ -223,15 +220,24 @@ class MRLEvaluator():
         for i_epoch in range(args.num_train_epochs):
             print("Epoch: {}".format(i_epoch))
             self.seq_cls_trainer.train(i_epoch)
+            # record performance on train set to check overfitting
+            self.seq_cls_trainer.eval(i_epoch, info="Train_set")
             self.seq_cls_trainer.eval(i_epoch)
+            if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
+                try:
+                    self.seq_cls_trainer.save_model(
+                        f'{args.output_dir}/{args.method}', i_epoch)
+                except Exception as e:
+                    print(e)
+                    print("Failed to save model.")
 
 
 class RNAFMEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
         self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
-        self.model = RNAFmForReg(self.model)
-        # self.model.apply(weights_init)
+        self.model = wrap_models.RNAFmForReg(
+            self.model, freeze_base=args.freeze_base)
         self.model.to(self.device)
 
 
@@ -239,7 +245,15 @@ class RNAErnieEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer=None) -> None:
         super().__init__(tokenizer)
         self.model = AutoModel.from_pretrained(args.model_path)
-        self.model = RNAErnieForReg(self.model).to(self.device)
+        self.model = wrap_models.RNAErnieForReg(
+            self.model, freeze_base=args.freeze_base).to(self.device)
+
+
+# class RNAErnieEvaluatorAB(MRLEvaluator):
+#     def __init__(self, args, tokenizer=None) -> None:
+#         super().__init__(tokenizer)
+#         self.model = AutoModel.from_pretrained(args.model_path)
+#         self.model = wrap_models.RNAErnieForRegAB(self.model).to(self.device)
 
 
 class RNAMsmEvaluator(MRLEvaluator):
@@ -247,7 +261,8 @@ class RNAMsmEvaluator(MRLEvaluator):
         super().__init__(tokenizer=tokenizer)
         model_config = get_config(args.model_config)
         self.model = MSATransformer(**model_config)
-        self.model = RNAMsmForReg(self.model, class_num=1)
+        self.model = wrap_models.RNAMsmForReg(
+            self.model, class_num=1, freeze_base=args.freeze_base)
         self.model._load_pretrained_bert(
             args.model_path)
         self.model.to(self.device)
@@ -259,7 +274,8 @@ class RNABertEvaluator(MRLEvaluator):
         # ========== Build tokenizer, model, criterion
         model_config = get_config(args.model_config)
         self.model = BertModel(model_config)
-        self.model = RNABERTForReg(self.model, class_num=1)
+        self.model = wrap_models.RNABERTForReg(
+            self.model, class_num=1, freeze_base=args.freeze_base)
         self.model._load_pretrained_bert(args.model_path)
         self.model.to(self.device)
 
@@ -269,7 +285,8 @@ class DNABERTEvaluator(MRLEvaluator):
         super().__init__(tokenizer=tokenizer)
         self.model = AutoModel.from_pretrained(
             args.model_path)
-        self.model = DNABERTForReg(self.model, args).to(self.device)
+        self.model = wrap_models.DNABERTForReg(
+            self.model, freeze_base=args.freeze_base).to(self.device)
 
 
 class DNABERT2Evaluator(MRLEvaluator):
@@ -278,7 +295,8 @@ class DNABERT2Evaluator(MRLEvaluator):
         config = BertConfig.from_pretrained(args.model_path)
         self.model = AutoModel.from_pretrained(
             args.model_path, trust_remote_code=True, config=config)
-        self.model = DNABERT2ForReg(self.model).to(self.device)
+        self.model = wrap_models.DNABERT2ForReg(
+            self.model, freeze_base=args.freeze_base).to(self.device)
 
 
 class NTEvaluator(MRLEvaluator):
@@ -287,18 +305,26 @@ class NTEvaluator(MRLEvaluator):
         super().__init__(tokenizer)
         self.model = AutoModelForMaskedLM.from_pretrained(
             args.model_path, trust_remote_code=True)
-        trainable_params = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
-        print("Trainable parameters: {}".format(trainable_params))
 
         peft_config = LoraConfig(
             task_type=TaskType.SEQ_CLS, inference_mode=False, r=1, lora_alpha=32, lora_dropout=0.1,
             target_modules=["query", "value"]
         )
-        self.model = get_peft_model(self.model, peft_config)
-        self.model.print_trainable_parameters()
-        self.model = NTForReg(self.model).to(self.device)
+        if not args.freeze_base:
+            # when not freeze_base, we need to set the base model with lora
+            self.model = get_peft_model(self.model, peft_config)
+        self.model = wrap_models.NTForReg(
+            self.model, freeze_base=args.freeze_base).to(self.device)
+
+
+class GENAEvaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        self.model = GENA.BertForMaskedLM.from_pretrained(
+            args.model_path)
+
+        self.model = wrap_models.GENAForReg(
+            self.model, freeze_base=args.freeze_base).to(self.device)
 
 
 class RNABertEvaluator(MRLEvaluator):
@@ -307,7 +333,8 @@ class RNABertEvaluator(MRLEvaluator):
         # ========== Build tokenizer, model, criterion
         model_config = get_config(args.model_config)
         self.model = BertModel(model_config)
-        self.model = RNABERTForReg(self.model)
+        self.model = wrap_models.RNABERTForReg(
+            self.model, freeze_base=args.freeze_base)
         self.model._load_pretrained_bert(args.model_path)
         self.model.to(self.device)
 
@@ -315,9 +342,25 @@ class RNABertEvaluator(MRLEvaluator):
 class ResNetEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
-        self.model = PureReg().to(self.device)
+        self.model = wrap_for_mrl.PureReg().to(self.device)
+
 
 class OptimusEvaluator(MRLEvaluator):
     def __init__(self, args, tokenizer=None):
         super().__init__(tokenizer=tokenizer)
-        self.model = Optimus(inp_len=100).to(self.device)
+        self.model = wrap_for_mrl.Optimus(inp_len=100).to(self.device)
+
+
+class UTRLMEvaluator(MRLEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        from model.UTRLM.utrlm import UTRLM
+        super().__init__(tokenizer=tokenizer)
+        self.model = UTRLM()
+        # load model weights
+        model_weights = torch.load(
+            args.model_path, map_location=torch.device('cpu'))
+        self.model.load_state_dict(
+            {k.replace('module.', ''): v for k, v in model_weights.items()}, strict=True)
+
+        self.model = wrap_models.UTRLMForReg(
+            self.model, freeze_base=args.freeze_base).to(self.device)

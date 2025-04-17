@@ -17,7 +17,12 @@ MAX_SEQ_LEN = {"RNABERT": 102,
                "ResNet": 102,
                'Optimus': 101,
                'NucleotideTransformer': 25,
+               "GENA-LM-base": 512//4,
+               "GENA-LM-large": 512//4,
+               'UTRLM': 102,
                }
+
+available_methods = MAX_SEQ_LEN.keys()
 
 
 def str2list(v):
@@ -36,13 +41,15 @@ if __name__ == '__main__':
         description='')
 
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'DNABERT2', 'SpliceBERT', 'RNABERT', 'ResNet', 'Optimus','NucleotideTransformer'], default='RNABERT')
+        "--method", choices=available_methods, default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
     parser.add_argument("--logging_steps", default=20, type=int)
     parser.add_argument("--lr", default=1e-4, type=float)
+    parser.add_argument("--freeze_base", default=1, type=int)
     parser.add_argument("--model_path", default=False)
+    parser.add_argument("--output_dir", default=False)
     parser.add_argument("--model_config", default=False)
     parser.add_argument("--vocab_path", default='model/RNABERT/vocab.txt')
     parser.add_argument("--use_kmer", default=0, type=int)
@@ -69,7 +76,7 @@ if __name__ == '__main__':
         args.replace_U = False
         args.max_seq_len = MAX_SEQ_LEN[args.method]
         tokenizer = RNATokenizer(args.vocab_path)
-
+        print('test', args.freeze_base)
         ev = mrl_evaluator.RNAFMEvaluator(args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
 
@@ -150,5 +157,26 @@ if __name__ == '__main__':
             args.model_path)
 
         ev = mrl_evaluator.NTEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'GENA-LM-base' or args.method == 'GENA-LM-large':
+        args.max_seq_len = MAX_SEQ_LEN[args.method]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = mrl_evaluator.GENAEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'UTRLM':
+        args.max_seq_len = MAX_SEQ_LEN["UTRLM"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = mrl_evaluator.UTRLMEvaluator(
             args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
