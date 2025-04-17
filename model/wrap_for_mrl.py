@@ -147,6 +147,18 @@ class RNAErnieForReg(nn.Module):
             1, 2)).squeeze(-1)
         return logits
 
+class RNAErnieForRegAB(nn.Module):
+    def __init__(self, bert):
+        super().__init__()
+        self.bert = bert
+        self.classifier = nn.Linear(768, 1)
+
+    def forward(self, input_ids):
+        logits = self.bert(input_ids, attention_mask=input_ids > 0)[
+            'last_hidden_state']
+        logits = self.classifier(logits[:, 0, :])
+        return logits
+
 
 class RNAMsmForReg(nn.Module):
     def __init__(self, bert, hidden_size=768, class_num=1):
