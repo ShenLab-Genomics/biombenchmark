@@ -59,8 +59,8 @@ class BaseMetrics(abc.ABC):
         """
         All args have same shapes.
         Args:
-            preds: predictions of model, (batch_size, 1)
-            labels: ground truth, (batch_size, 1)
+            preds: predictions of model
+            labels: ground truth
 
         Returns:
             accuracy
@@ -72,8 +72,8 @@ class BaseMetrics(abc.ABC):
         """
         All args have same shapes.
         Args:
-            preds: predictions of model, (batch_size, 1)
-            labels: ground truth, (batch_size, 1)
+            preds: predictions of model
+            labels: ground truth
 
         Returns:
             precision
@@ -85,8 +85,8 @@ class BaseMetrics(abc.ABC):
         """
         All args have same shapes.
         Args:
-            preds: predictions of model, (batch_size, 1)
-            labels: ground truth, (batch_size, 1)
+            preds: predictions of model
+            labels: ground truth
 
         Returns:
             precision
@@ -98,8 +98,8 @@ class BaseMetrics(abc.ABC):
         """
         All args have same shapes.
         Args:
-            preds: predictions of model, (batch_size, 1)
-            labels: ground truth, (batch_size, 1)
+            preds: predictions of model
+            labels: ground truth
 
         Returns:
             precision
@@ -111,8 +111,8 @@ class BaseMetrics(abc.ABC):
         """
         All args have same shapes.
         Args:
-            preds: predictions of model, (batch_size, 1)
-            labels: ground truth, (batch_size, 1)
+            preds: predictions of model
+            labels: ground truth
 
         Returns:
             precision
@@ -124,8 +124,8 @@ class BaseMetrics(abc.ABC):
         """
         All args have same shapes.
         Args:
-            preds: predictions of model, (batch_size, 1)
-            labels: ground truth, (batch_size, 1)
+            preds: predictions of model
+            labels: ground truth
 
         Returns:
             precision
@@ -139,8 +139,8 @@ class BaseMetrics(abc.ABC):
         """
         All args have same shapes.
         Args:
-            preds: predictions of model, (batch_size, 1)
-            labels: ground truth, (batch_size, 1)
+            preds: predictions of model
+            labels: ground truth
 
         Returns:
             precision

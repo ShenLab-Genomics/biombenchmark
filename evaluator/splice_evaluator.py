@@ -14,6 +14,7 @@ from model.SpTransformer.sptransformer import Ex2
 from model.SpliceAI import spliceai
 from model.Pangolin import pangolin
 from model.wrap_for_splice import SpliceBERTForTokenCls, DNABERTForTokenCls, RNAFmForTokenCls, RNAErnieForTokenCls, RNAMsmForTokenCls, MAMBAForTokenCls, NTForTokenCls, NTForTokenClsShort, RNABertForTokenCls
+from model import wrap_models
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForTokenClassification, AutoModel, AutoModelForMaskedLM
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
@@ -89,6 +90,31 @@ class SpliceTokenClsLoss(nn.Module):
             assert torch.isnan(labels).sum() == 0, "Labels is NaN."
             # loss = loss1 + loss2
             assert torch.isnan(loss).sum() == 0, "Loss is NaN."
+        else:
+            raise ValueError("Invalid prediction dimension.")
+        return loss
+
+
+class SpliceTokenClsLossForGENA(SpliceTokenClsLoss):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, outputs, labels):
+        # special for GENA
+        mask = torch.sum(labels, dim=1) > 0
+        labels = labels[mask]
+        outputs = outputs[mask]
+        #
+
+        pred_dim = outputs.shape[1]
+        if pred_dim == 3:
+            outputs = outputs[:, :3]
+            labels = labels[:, :3]
+            loss = F.cross_entropy(outputs, labels)
+
+        elif pred_dim == 15 or pred_dim == 53:
+            loss = F.binary_cross_entropy_with_logits(
+                outputs[:, :], labels[:, 3:])
         else:
             raise ValueError("Invalid prediction dimension.")
         return loss
@@ -180,13 +206,55 @@ class SpliceMetrics(BaseMetrics):
         return auroc
 
 
+class SpliceMetricsForGENA(SpliceMetrics):
+    def __call__(self, outputs, labels, epoch=0):
+        """
+        Args:
+            outputs: logits in tensor
+            labels: labels in tensor
+        Returns:
+            metrics in dict
+        """
+        # special for GENA
+        mask = torch.sum(labels, dim=1) > 0
+        labels = labels[mask]
+        outputs = outputs[mask]
+        #
+
+        pred_dim = outputs.shape[-1]
+        res = {}
+        if pred_dim == 3:
+            # neither / acceptor / donor
+            # calculate class 1 and 2
+            outputs = torch.softmax(outputs, dim=1)[:, 1:]
+            labels = labels[:, 1:3]
+
+        elif pred_dim == 15 or pred_dim == 53:
+            # calculate 15 tissues separately
+            outputs = torch.sigmoid(outputs[:, :])
+            labels = labels[:, 3:]
+
+        else:
+            raise ValueError("Invalid prediction dimension.")
+        for name in self.metrics:
+            func = getattr(self, name)
+            if func:
+                for i in range(outputs.shape[1]):
+                    m = func(outputs[:, i], labels[:, i])
+                    res[name + '_' + str(i)] = m
+                # m = func(outputs, labels)
+            else:
+                raise NotImplementedError
+        return res
+
+
 class SpliceTrainer(BaseTrainer):
     def train(self, epoch):
         self.model.train()
         time_st = time.time()
         num_total, loss_total = 0, 0
 
-        with tqdm(total=len(self.train_dataset), mininterval=2) as pbar:
+        with tqdm(total=len(self.train_dataset), mininterval=5) as pbar:
             for i, data in enumerate(self.train_dataloader):
                 # for non-language model, the "input_ids" represents the one-hot encoding of the sequence
                 input_ids = data["input_ids"].to(self.args.device)
@@ -219,13 +287,18 @@ class SpliceTrainer(BaseTrainer):
         print('Train\tLoss: {:.6f}; Time: {:.4f}s'.format(
             loss.item(), time_ed))
 
-    def eval(self, epoch):
+    def eval(self, epoch, info="Test_set"):
         self.model.eval()
         time_st = time.time()
         num_total = 0
-        with tqdm(total=len(self.eval_dataset), mininterval=2) as pbar:
+
+        target_dataloader = self.eval_dataloader
+        if info == "Train_set":
+            target_dataloader = self.train_dataloader
+
+        with tqdm(total=len(target_dataloader), mininterval=5) as pbar:
             outputs_dataset, labels_dataset = [], []
-            for i, data in enumerate(self.eval_dataloader):
+            for i, data in enumerate(target_dataloader):
                 input_ids = data["input_ids"].to(self.args.device)
                 labels = data["labels"].to(self.args.device)
 
@@ -256,18 +329,14 @@ class SpliceTrainer(BaseTrainer):
 
         # log results to screen/bash
         results = {}
-        log = 'Test\t' + self.args.method + "\t"
-        # log results to visualdl
-        tag_value = defaultdict(float)
+        log = 'Test\t' + self.args.method + "\t" + info + "\t"
         # extract results
         for k, v in metrics_dataset.items():
             log += k + ": {" + k + ":.4f}\t"
             results[k] = v
-            tag = "eval/" + k
-            tag_value[tag] = v
 
         time_ed = time.time() - time_st
-        print(results, "; Time: {:.4f}s".format(time_ed))
+        print(log.format(**results), "; Time: {:.4f}s".format(time_ed))
 
 
 def seq2kmer(seq, kmer=1):
@@ -302,7 +371,7 @@ class SpliceTokenCollator(BaseCollator):
                 "T", "U") if self.replace_T else seq.replace("U", "T")
 
             start = (len(seq) - self.max_seq_len)//2
-            if self.use_kmer > 0 or self.use_kmer ==-11:
+            if self.use_kmer > 0 or self.use_kmer == -11:
                 seq = seq[start-self.overflow:start +
                           self.max_seq_len+self.overflow]
                 seq = seq2kmer(seq)
@@ -314,8 +383,8 @@ class SpliceTokenCollator(BaseCollator):
             if self.use_kmer == -10:  # a special marker
                 input_text = input_text.replace('N', 'A')
             if self.use_kmer == -11:
-                input_text = input_text.replace('N','[PAD]')
-                
+                input_text = input_text.replace('N', '[PAD]')
+
             input_ids = self.tokenizer(input_text)["input_ids"]
 
             input_ids_stack.append(input_ids)
@@ -377,6 +446,62 @@ class SpliceOneHotCollator(BaseCollator):
             labels_stack.append(data[1])
         return {
             "input_ids": torch.from_numpy(self.stack_fn(input_ids_stack)).transpose(1, 2),
+            "labels": torch.from_numpy(self.stack_fn(labels_stack))}
+
+
+class SpliceCollatorForGENA(BaseCollator):
+    def __init__(self, max_seq_len, tokenizer, replace_T=True, replace_U=False, use_kmer=True, overflow=0):
+        super().__init__()
+        self.max_seq_len = max_seq_len
+        self.tokenizer = tokenizer
+        assert replace_T ^ replace_U, "Only replace T or U."
+        self.replace_T = replace_T
+        self.replace_U = replace_U
+        self.use_kmer = int(use_kmer)
+        self.overflow = overflow
+
+    def __call__(self, raw_data):
+        input_ids_stack = []
+        labels_stack = []
+
+        for data in raw_data:
+            seq = data[0]
+            seq = seq.upper()
+            seq = seq.replace(
+                "T", "U") if self.replace_T else seq.replace("U", "T")
+
+            start = (len(seq) - self.max_seq_len)//2
+
+            left = seq[start-self.overflow:start]
+            mid = seq[start:start+self.max_seq_len]
+            right = seq[start+self.max_seq_len:start +
+                        self.max_seq_len+self.overflow]
+            # encode left , mid and right separately.
+            mid_input_ids = self.tokenizer(
+                mid.replace('N', '[UNK]'))["input_ids"]
+            if len(mid_input_ids) < self.max_seq_len:
+                mid_input_ids = mid_input_ids + 3 * \
+                    (self.max_seq_len - len(mid_input_ids))  # [PAD] = 3
+
+            left = self.tokenizer(
+                left.replace('N', '[UNK]'))["input_ids"]
+            right = self.tokenizer(
+                right.replace('N', '[UNK]'))["input_ids"]
+
+            # extend labels to the same length as input_ids
+            label = data[1]  # shape (channels, seq_len)
+            channels = label.shape[0]
+            left_label = np.zeros((channels, len(left)))  # all zeros
+            right_label = np.zeros((channels, len(right)))
+            label = np.concatenate((left_label, label, right_label), axis=1)
+
+            input_ids = left + mid_input_ids + right
+            input_ids_stack.append(input_ids)
+
+            labels_stack.append(label)
+
+        return {
+            "input_ids": torch.from_numpy(self.stack_fn(input_ids_stack)),
             "labels": torch.from_numpy(self.stack_fn(labels_stack))}
 
 
@@ -531,6 +656,17 @@ class NTEvaluator(SpliceEvaluator):
             self.model, num_labels=args.class_num).to(self.device)
         self.mode = 'token'
 
+        # manually load trained .pt file
+        if args.class_num == 15:
+            self.model.load_state_dict(
+                torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_15class_1e-4/epoch_4_model_state.pt'))
+        if args.class_num == 53:
+            self.model.load_state_dict(
+                torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_53class_1e-4/epoch_4_model_state.pt'))
+        if args.class_num == 3:
+            self.model.load_state_dict(
+                torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_3class_1e-4/epoch_4_model_state.pt'))
+
 
 class NTShortEvaluator(SpliceEvaluator):
     def __init__(self, args, tokenizer=None) -> None:
@@ -651,25 +787,6 @@ class PangolinEvaluator(SpliceEvaluator):
             break
 
 
-'''
-class RNAMAMBAEvaluator(SpliceEvaluator):
-    def __init__(self, args, tokenizer=None):
-        super().__init__(args, tokenizer)
-
-        config = Mamba2Config(
-            vocab_size=25,  # 词汇表大小
-            num_heads=16,
-            head_dim=64,
-            hidden_size=256,   # 隐藏层大小
-            num_hidden_layers=12,  # 隐藏层数量
-        )
-
-        # 使用配置创建模型，不加载预训练权重
-        self.model = Mamba2Model(config)
-        self.model = MAMBAForTokenCls(self.model).to(self.device)
-'''
-
-
 class RNABertEvaluator(SpliceEvaluator):
     def __init__(self, args, tokenizer=None):
         super().__init__(args, tokenizer)
@@ -679,3 +796,41 @@ class RNABertEvaluator(SpliceEvaluator):
         self.model._load_pretrained_bert(args.model_path)
         self.model.to(self.device)
         self.mode = 'token'
+
+
+class GENAEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer=None):
+        from model.GENA import modeling_bert as GENA
+        super().__init__(args, tokenizer)
+        self.model = GENA.BertForTokenClassification.from_pretrained(
+            args.model_path, num_labels=args.class_num,
+        )
+        self.model = wrap_models.GENAForTokenCls(
+            self.model).to(self.device)
+
+    def buildTrainer(self, args):
+        self._loss_fn = SpliceTokenClsLossForGENA().to(self.device)
+        self._collate_fn = SpliceCollatorForGENA(
+            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        self._metric = SpliceMetricsForGENA(metrics=args.metrics)
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
+        print("GENA model loaded.")
+
+
+class UTRLMEvaluator(SpliceEvaluator):
+    def __init__(self, args, tokenizer):
+        from model.UTRLM.utrlm import UTRLM
+        super().__init__(args, tokenizer)
+        self.model = UTRLM()
+        # load model weights
+        model_weights = torch.load(
+            args.model_path, map_location=torch.device('cpu'))
+        self.model.load_state_dict(
+            {k.replace('module.', ''): v for k, v in model_weights.items()}, strict=True)
+
+        self.model = wrap_models.UTRLMForTokenCls(
+            self.model, class_num=args.class_num).to(self.device)

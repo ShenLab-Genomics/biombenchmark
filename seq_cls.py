@@ -14,8 +14,10 @@ MAX_SEQ_LEN = {"RNABERT": 440,
                "SpliceBERT": 512,
                "RNAErnie": 512,
                "GENA-LM-base": 512,
-               "GENA-LM-base": 512,
-               'NucleotideTransformer': 100,  # 6-mers
+               "GENA-LM-large": 512//5,
+               "UTRLM": 512,
+               'NucleotideTransformer': 100,  # 6-mers，
+               "ncRDense": 750
                }
 available_methods = MAX_SEQ_LEN.keys()
 
@@ -49,9 +51,9 @@ if __name__ == '__main__':
     parser.add_argument("--use_kmer", default=1, type=int)
     parser.add_argument("--pad_token_id", default=0, type=int)
     parser.add_argument("--dataset", type=str)
-    parser.add_argument("--data_group", type=str)
+    parser.add_argument("--data_group", type=str, default='nRC')
     parser.add_argument('--metrics', type=str2list,
-                        default="F1s,Precision,Recall,Accuracy,Mcc",)  # optional: Emb
+                        default="F1s,Precision,Recall,Accuracy,Mcc,classwise_acc,classwise_prauc",)  # optional: Emb
     parser.add_argument("--extract_emb", default=False)
 
     args = parser.parse_args()
@@ -63,11 +65,26 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     ###
+    if 'nRC' in args.data_group:
+        args.labelset = 'nRC'
+    elif 'mix' in args.data_group:
+        args.labelset = 'mix'
+    else:
+        raise NotImplementedError(
+            f"data_group {args.data_group} not implemented yet.")
 
-    dataset_train = seq_cls_dataset.SeqClsDataset(
-        fasta_dir=args.dataset, prefix='nRC')
-    dataset_test = seq_cls_dataset.SeqClsDataset(
-        fasta_dir=args.dataset, prefix='nRC', train=False)
+    if args.method != 'ncRDense':
+        dataset_train = seq_cls_dataset.SeqClsDataset(
+            fasta_dir=args.dataset, prefix=args.data_group)
+        dataset_test = seq_cls_dataset.SeqClsDataset(
+            fasta_dir=args.dataset, prefix=args.data_group, train=False)
+    else:
+        dataset_train = seq_cls_dataset.SeqClsDatasetOneHot(
+            fasta_dir=args.dataset, prefix=args.data_group,rnafold=True)
+        dataset_test = seq_cls_dataset.SeqClsDatasetOneHot(
+            fasta_dir=args.dataset, prefix=args.data_group, train=False,rnafold=True)
+
+    #
 
     args.max_seq_len = MAX_SEQ_LEN[args.method]
     if args.method == 'RNABERT':
@@ -153,4 +170,23 @@ if __name__ == '__main__':
 
         ev = seq_cls_evaluator.GENAEvaluator(
             args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'UTRLM':
+        args.max_seq_len = MAX_SEQ_LEN["UTRLM"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = seq_cls_evaluator.UTRLMEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'ncRDense':
+        args.max_seq_len = MAX_SEQ_LEN["ncRDense"]
+        args.replace_T = False
+        args.replace_U = True
+
+        ev = seq_cls_evaluator.ncRDenseEvaluator(
+            args, tokenizer=None)
         ev.run(args, dataset_train, dataset_test)

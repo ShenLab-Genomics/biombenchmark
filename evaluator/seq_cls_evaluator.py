@@ -8,8 +8,9 @@ from model.RNABERT.bert import get_config
 from model.RNABERT.rnabert import BertModel
 from model.RNAMSM.model import MSATransformer
 import model.RNAFM.fm as fm
-from model.wrap_for_cls import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss, DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls, NTForSeqCls
-from model.wrap_models import GENAForSeqCls
+# from model.wrap_for_cls import RNABertForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss, DNABERTForSeqCls, DNABERT2ForSeqCls, RNAErnieForSeqCls, NTForSeqCls
+from model.wrap_for_cls import SeqClsLoss
+from model import wrap_models
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from model.GENA import modeling_bert as GENA
@@ -36,13 +37,23 @@ LABEL2ID = {
         "leader": 11,
         "miRNA": 12
     },
-    "lncRNA_H": {
-        "lnc": 0,
-        "pc": 1
-    },
-    "lncRNA_M": {
-        "lnc": 0,
-        "pc": 1
+    "mix": {
+        "CD-box": 0,
+        "HACA-box": 1,
+        "scaRNA": 2,
+        "Y_RNA": 3,
+        "tRNA": 4,
+        "Intron_gpI": 5,
+        "Intron_gpII": 6,
+        "5S_rRNA": 7,
+        "5.8S_rRNA": 8,
+        "miRNA": 9,
+        "riboswitch": 10,
+        "leader": 11,
+        "IRES": 12,
+        "lncRNA": 13,
+        "piRNA": 14,
+        "circRNA": 15
     },
 }
 
@@ -70,7 +81,7 @@ class SeqClsMetrics(BaseMetrics):
         for name in self.metrics:
             func = getattr(self, name)
             if func:
-                if (func == self.auc) or (func == self.pr_auc):
+                if (func == self.auc) or (func == self.pr_auc) or func == self.classwise_prauc:
                     # given two neural outputs, calculate their logits
                     # and then calculate auc
                     logits = torch.sigmoid(outputs).cpu().numpy()
@@ -125,6 +136,37 @@ class SeqClsMetrics(BaseMetrics):
 
         prauc = auc(recall, precision)
         return prauc, precision, recall
+
+    @staticmethod
+    def classwise_acc(preds, labels):
+        """
+        For multi-class classification, calculate the class-wise accuracy.
+        """
+        num_classes = len(np.unique(labels))
+        classwise_acc = []
+        for i in range(num_classes):
+            classwise_acc.append(
+                np.sum(preds[labels == i] == i) / np.sum(labels == i))
+        classwise_acc = [str(round(x, 4)) for x in classwise_acc]
+        classwise_acc = "|".join(classwise_acc)
+        return classwise_acc
+
+    @staticmethod
+    def classwise_prauc(preds, labels):
+        """
+        For multi-class classification, calculate the class-wise prauc.
+        """
+        num_classes = len(np.unique(labels))
+        classwise_prauc = []
+        for i in range(num_classes):
+            # Calculate precision and recall for each class
+            precision, recall, _ = precision_recall_curve(
+                labels == i, preds[:, i])
+            prauc = auc(recall, precision)
+            classwise_prauc.append(prauc)
+        classwise_prauc = [str(round(x, 4)) for x in classwise_prauc]
+        classwise_prauc = "|".join(classwise_prauc)
+        return classwise_prauc
 
     def emb(self, pred, labels, epoch=0):
         fsave = os.path.join(
@@ -239,17 +281,18 @@ class SeqClsOneHotCollator(BaseCollator):
     def one_hot_encode(X, use_map):
         return use_map[X.astype('int8')]
 
-    def __init__(self, max_seq_len, tokenizer, replace_T=True, replace_U=False, use_kmer=True, overflow=0):
+    def __init__(self, max_seq_len, tokenizer, label2id, replace_T=True, replace_U=False, use_kmer=True, overflow=0):
         super().__init__()
         self.max_seq_len = max_seq_len
         self.tokenizer = tokenizer
+        self.label2id = label2id
         assert replace_U, "Only use ACGT."
 
     def __call__(self, raw_data):
         input_ids_stack = []
         labels_stack = []
         for data in raw_data:
-            seq = data[0]
+            seq = data['seq']
             seq = seq.upper()
             seq = seq.replace("U", "T")
             seq = np.array([self.char_map[x] for x in seq])
@@ -257,10 +300,10 @@ class SeqClsOneHotCollator(BaseCollator):
 
             if len(data) == 3:
                 # one-hot encoding of the secondary structure
-                ss = data[2]
+                ss = data['struct']
                 ss = np.array([self.char_map[x] for x in ss])
                 ss = self.one_hot_encode(ss, self.IN_MAP_SS)
-                input_ids = np.concatenate([input_ids, ss], axis=0)
+                input_ids = np.concatenate([input_ids, ss], axis=1)
 
             # padding to max_seq_len with zero
             if len(input_ids) < self.max_seq_len:
@@ -269,7 +312,8 @@ class SeqClsOneHotCollator(BaseCollator):
             if len(input_ids) > self.max_seq_len:
                 input_ids = input_ids[:self.max_seq_len]
 
-            labels_stack.append(data[1])
+            input_ids_stack.append(input_ids)
+            labels_stack.append(self.label2id[data['label']])
         return {
             "input_ids": torch.from_numpy(self.stack_fn(input_ids_stack)).transpose(1, 2),
             "labels": torch.from_numpy(self.stack_fn(labels_stack))}
@@ -319,7 +363,7 @@ class SeqClsTrainer(BaseTrainer):
         if info == "Train_set":
             target_dataloader = self.train_dataloader
 
-        with tqdm(total=len(target_dataloader.dataset)) as pbar:
+        with tqdm(total=len(target_dataloader.dataset), mininterval=5) as pbar:
             outputs_dataset, labels_dataset = [], []
             for i, data in enumerate(target_dataloader):
                 input_ids = data["input_ids"].to(self.args.device)
@@ -345,14 +389,13 @@ class SeqClsTrainer(BaseTrainer):
         # log results to screen/bash
         results = {}
         log = 'Test\t' + self.args.method + "\t" + info + "\t"
-        # log results to visualdl
-        tag_value = defaultdict(float)
         # extract results
         for k, v in metrics_dataset.items():
-            log += k + ": {" + k + ":.4f}\t"
+            if k == "classwise_acc" or k == "classwise_prauc":
+                log += k + ": {" + k + "}\t"
+            else:
+                log += k + ": {" + k + ":.4f}\t"
             results[k] = v
-            tag = "eval/" + k
-            tag_value[tag] = v
 
         time_ed = time.time() - time_st
         print(log.format(**results), "; Time: {:.4f}s".format(time_ed))
@@ -401,7 +444,7 @@ class SeqClsEvaluator:
         self._loss_fn = SeqClsLoss().to(self.device)
         self._collate_fn = SeqClsCollator(
             max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
-            label2id=LABEL2ID['nRC'],
+            label2id=LABEL2ID[args.labelset],
             replace_T=args.replace_T,
             replace_U=args.replace_U,
             use_kmer=args.use_kmer,
@@ -442,7 +485,7 @@ class SeqClsEvaluator:
             if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
                 try:
                     seq_cls_trainer.save_model(
-                        args.output_dir, i_epoch)
+                        f'{args.output_dir}/{args.method}', i_epoch)
                 except Exception as e:
                     print(e)
                     print("Failed to save model.")
@@ -454,7 +497,8 @@ class RNABertEvaluator(SeqClsEvaluator):
         # ========== Build tokenizer, model, criterion
         model_config = get_config(args.model_config)
         self.model = BertModel(model_config)
-        self.model = RNABertForSeqCls(self.model)
+        self.model = wrap_models.RNABertForSeqCls(
+            self.model, class_num=args.class_num)
         self.model._load_pretrained_bert(args.model_path)
         self.model.to(self.device)
 
@@ -467,7 +511,8 @@ class RNAMsmEvaluator(SeqClsEvaluator):
         super().__init__(tokenizer=tokenizer)
         model_config = get_config(args.model_config)
         self.model = MSATransformer(**model_config)
-        self.model = RNAMsmForSeqCls(self.model)
+        self.model = wrap_models.RNAMsmForSeqCls(
+            self.model, class_num=args.class_num)
         self.model._load_pretrained_bert(
             args.model_path)
         self.model.to(self.device)
@@ -477,7 +522,8 @@ class RNAFMEvaluator(SeqClsEvaluator):
     def __init__(self, args, tokenizer) -> None:
         super().__init__(tokenizer=tokenizer)
         self.model, alphabet = fm.pretrained.rna_fm_t12(args.model_path)
-        self.model = RNAFmForSeqCls(self.model)
+        self.model = wrap_models.RNAFmForSeqCls(
+            self.model, class_num=args.class_num)
         self.model.to(self.device)
 
 
@@ -486,7 +532,7 @@ class DNABERTEvaluatorSeqCls(SeqClsEvaluator):
         super().__init__(tokenizer=tokenizer)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=args.class_num).to(self.device)
-        self.model = DNABERTForSeqCls(self.model)
+        self.model = wrap_models.DNABERTForSeqCls(self.model)
 
 
 class SpliceBERTEvaluatorSeqCls(DNABERTEvaluatorSeqCls):
@@ -501,7 +547,7 @@ class RNAErnieEvaluator(SeqClsEvaluator):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=args.class_num
         )
-        self.model = RNAErnieForSeqCls(self.model).to(self.device)
+        self.model = wrap_models.RNAErnieForSeqCls(self.model).to(self.device)
 
 
 class DNABERT2Evaluator(SeqClsEvaluator):
@@ -511,7 +557,7 @@ class DNABERT2Evaluator(SeqClsEvaluator):
         self.model = AutoModelForSequenceClassification.from_pretrained(
             args.model_path, num_labels=args.class_num, trust_remote_code=True,
         )
-        self.model = DNABERT2ForSeqCls(self.model).to(self.device)
+        self.model = wrap_models.DNABERT2ForSeqCls(self.model).to(self.device)
 
 
 class NTEvaluator(SeqClsEvaluator):
@@ -533,8 +579,7 @@ class NTEvaluator(SeqClsEvaluator):
         )
         self.model = get_peft_model(self.model, peft_config)
         self.model.print_trainable_parameters()
-        self.model = NTForSeqCls(self.model).to(self.device)
-        print(self.model)
+        self.model = wrap_models.NTForSeqCls(self.model).to(self.device)
 
 
 class GENAEvaluator(SeqClsEvaluator):
@@ -544,4 +589,45 @@ class GENAEvaluator(SeqClsEvaluator):
         self.model = GENA.BertForSequenceClassification.from_pretrained(
             args.model_path, num_labels=args.class_num,
         )
-        self.model = GENAForSeqCls(self.model).to(self.device)
+        self.model = wrap_models.GENAForSeqCls(self.model).to(self.device)
+
+
+class UTRLMEvaluator(SeqClsEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        from model.UTRLM.utrlm import UTRLM
+        super().__init__(tokenizer=tokenizer)
+        self.model = UTRLM()
+        # load model weights
+        model_weights = torch.load(
+            args.model_path, map_location=torch.device('cpu'))
+        self.model.load_state_dict(
+            {k.replace('module.', ''): v for k, v in model_weights.items()}, strict=True)
+
+        self.model = wrap_models.UTRLMForSeqCls(
+            self.model, class_num=args.class_num).to(self.device)
+
+
+class ncRDenseEvaluator(SeqClsEvaluator):
+    from model.ncRDense.model import ncRDense
+
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=None)
+        self.model = self.ncRDense(
+            num_classes=args.class_num).float().to(self.device)
+
+    def buildTrainer(self, args):
+        self._loss_fn = SeqClsLoss().to(self.device)
+        self._collate_fn = SeqClsOneHotCollator(
+            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer,
+            replace_T=args.replace_T,
+            replace_U=args.replace_U,
+            label2id=LABEL2ID[args.labelset],
+            use_kmer=args.use_kmer)
+        self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
+        self._metric = SeqClsMetrics(metrics=args.metrics,
+                                     save_path=f'{args.output_dir}/{args.method}')
+
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print("Trainable parameters: {}".format(trainable_params))
