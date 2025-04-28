@@ -147,6 +147,7 @@ class RNAErnieForReg(nn.Module):
             1, 2)).squeeze(-1)
         return logits
 
+
 class RNAErnieForRegAB(nn.Module):
     def __init__(self, bert):
         super().__init__()
@@ -273,6 +274,7 @@ class PureReg(nn.Module):
         # print(logits.shape)
         return logits
 
+
 class Optimus(nn.Module):
     def __init__(self, inp_len=50, nodes=40, layers=3, filter_len=8, nbr_filters=120,
                  dropout1=0, dropout2=0, dropout3=0.2, base_token=5):
@@ -304,7 +306,7 @@ class Optimus(nn.Module):
         self.model.add_module('fc2', nn.Linear(nodes, 1))
 
     def forward(self, input_ids):
-        # convert token for RNA-FM to one-hot encoding
+        # convert token from RNA-FM to one-hot encoding
         nest_tokens = (input_ids[:, 1:] - 4)  # drop the first [CLS] token
         token_padding_mask = nest_tokens.ge(0).long()
         one_hot_tokens = torch.nn.functional.one_hot(

@@ -76,7 +76,6 @@ if __name__ == '__main__':
         args.replace_U = False
         args.max_seq_len = MAX_SEQ_LEN[args.method]
         tokenizer = RNATokenizer(args.vocab_path)
-        print('test', args.freeze_base)
         ev = mrl_evaluator.RNAFMEvaluator(args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
 

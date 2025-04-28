@@ -102,10 +102,10 @@ class SpliceTokenClsLossForGENA(SpliceTokenClsLoss):
     def forward(self, outputs, labels):
         # special for GENA
         mask = torch.sum(labels, dim=1) > 0
-        labels = labels[mask]
-        outputs = outputs[mask]
+        keep_indices = torch.where(mask)
+        labels = labels[keep_indices[0], :, keep_indices[1]]
+        outputs = outputs[keep_indices[0], :, keep_indices[1]]
         #
-
         pred_dim = outputs.shape[1]
         if pred_dim == 3:
             outputs = outputs[:, :3]
@@ -151,7 +151,12 @@ class SpliceMetrics(BaseMetrics):
             if func:
                 for i in range(outputs.shape[1]):
                     m = func(outputs[:, i], labels[:, i])
-                    res[name + '_' + str(i)] = m
+                    if name == 'topk':
+                        # for topk, we need to get the threshold
+                        res[name + '_' + str(i)] = m['topkl']
+                        res[name + '_threshold_' + str(i)] = m['threshold']
+                    else:
+                        res[name + '_' + str(i)] = m
                 # m = func(outputs, labels)
             else:
                 raise NotImplementedError
@@ -216,9 +221,10 @@ class SpliceMetricsForGENA(SpliceMetrics):
             metrics in dict
         """
         # special for GENA
+        print("outputs shape: ", outputs.shape, labels.shape)
         mask = torch.sum(labels, dim=1) > 0
-        labels = labels[mask]
-        outputs = outputs[mask]
+        labels = labels[mask, :]
+        outputs = outputs[mask, :]
         #
 
         pred_dim = outputs.shape[-1]
@@ -241,8 +247,12 @@ class SpliceMetricsForGENA(SpliceMetrics):
             if func:
                 for i in range(outputs.shape[1]):
                     m = func(outputs[:, i], labels[:, i])
-                    res[name + '_' + str(i)] = m
-                # m = func(outputs, labels)
+                    if name == 'topk':
+                        # for topk, we need to get the threshold
+                        res[name + '_' + str(i)] = m['topkl']
+                        res[name + '_threshold_' + str(i)] = m['threshold']
+                    else:
+                        res[name + '_' + str(i)] = m
             else:
                 raise NotImplementedError
         return res
@@ -479,25 +489,62 @@ class SpliceCollatorForGENA(BaseCollator):
             # encode left , mid and right separately.
             mid_input_ids = self.tokenizer(
                 mid.replace('N', '[UNK]'))["input_ids"]
-            if len(mid_input_ids) < self.max_seq_len:
-                mid_input_ids = mid_input_ids + 3 * \
-                    (self.max_seq_len - len(mid_input_ids))  # [PAD] = 3
+            # extend labels to the same length as input_ids
+            raw_label = data[1]  # shape (channels, seq_len)
 
+            # 根据每个token的长度，把char level的label转换为 token level的label
+            # 这里的label是一个二维的np.array，第一维是通道数，第二维是token的长度
+            # 在token level的label中，每个label是原始labels的按位或
+
+            # 首先求每个token在原始序列中对应的位置
+            index = 0
+            labels = []
+            for i in range(len(mid_input_ids)):
+                token = self.tokenizer.decode(mid_input_ids[i])
+                # print(token)
+                if '[' in token:
+                    labels.append(np.zeros((raw_label.shape[0], 1)))
+                    continue
+                st = index
+                ed = index + len(token)
+                new_label = np.zeros((raw_label.shape[0], 1))
+                if raw_label[1, st:ed].sum() > 0:
+                    new_label[0, 0] = 0
+                    new_label[1, 0] = 1
+                    new_label[2, 0] = 0
+                elif raw_label[2, st:ed].sum() > 0:
+                    new_label[0, 0] = 0
+                    new_label[1, 0] = 0
+                    new_label[2, 0] = 1
+                else:
+                    new_label[0, 0] = 1
+                    new_label[1, 0] = 0
+                    new_label[2, 0] = 0
+                new_label[3:, 0] = raw_label[3:, st:ed].sum(axis=1)
+                labels.append(new_label)
+
+            pad_len = self.max_seq_len - len(mid_input_ids)
+            # use left and right to pad the mid_input_ids
             left = self.tokenizer(
                 left.replace('N', '[UNK]'))["input_ids"]
             right = self.tokenizer(
                 right.replace('N', '[UNK]'))["input_ids"]
+            pad_left = pad_len // 2
+            pad_right = pad_len - pad_left
 
-            # extend labels to the same length as input_ids
-            label = data[1]  # shape (channels, seq_len)
-            channels = label.shape[0]
-            left_label = np.zeros((channels, len(left)))  # all zeros
-            right_label = np.zeros((channels, len(right)))
-            label = np.concatenate((left_label, label, right_label), axis=1)
+            left = left[-pad_left:]
+            right = right[:pad_right]
+            left_label = np.zeros((raw_label.shape[0], len(left)))
+            right_label = np.zeros((raw_label.shape[0], len(right)))
 
             input_ids = left + mid_input_ids + right
-            input_ids_stack.append(input_ids)
+            labels = np.concatenate(labels, axis=1)
+            label = np.concatenate(
+                (left_label,
+                 labels,
+                 right_label), axis=1)
 
+            input_ids_stack.append(input_ids)
             labels_stack.append(label)
 
         return {
@@ -553,11 +600,13 @@ class SpliceEvaluator:
         for i_epoch in range(args.num_train_epochs):
             print("Epoch: {}".format(i_epoch))
             self.token_cls_trainer.train(i_epoch)
+            # record performance on train set to check overfitting
+            self.token_cls_trainer.eval(i_epoch, info="Train_set")
             self.token_cls_trainer.eval(i_epoch)
             if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
                 try:
                     self.token_cls_trainer.save_model(
-                        args.output_dir, i_epoch)
+                        f'{args.output_dir}/{args.method}', i_epoch)
                 except Exception as e:
                     print(e)
                     print("Failed to save model.")
@@ -809,9 +858,18 @@ class GENAEvaluator(SpliceEvaluator):
             self.model).to(self.device)
 
     def buildTrainer(self, args):
+        if 'short' in args.method:
+            args.overflow = 0
+        else:
+            args.overflow = 4250
         self._loss_fn = SpliceTokenClsLossForGENA().to(self.device)
         self._collate_fn = SpliceCollatorForGENA(
-            max_seq_len=args.max_seq_len, tokenizer=self.tokenizer, replace_T=args.replace_T, replace_U=args.replace_U, use_kmer=args.use_kmer)
+            max_seq_len=args.max_seq_len,
+            tokenizer=self.tokenizer,
+            replace_T=args.replace_T,
+            replace_U=args.replace_U,
+            use_kmer=args.use_kmer,
+            overflow=args.overflow)
         self._optimizer = AdamW(params=self.model.parameters(), lr=args.lr)
         self._metric = SpliceMetricsForGENA(metrics=args.metrics)
         trainable_params = sum(
@@ -833,4 +891,4 @@ class UTRLMEvaluator(SpliceEvaluator):
             {k.replace('module.', ''): v for k, v in model_weights.items()}, strict=True)
 
         self.model = wrap_models.UTRLMForTokenCls(
-            self.model, class_num=args.class_num).to(self.device)
+            self.model, class_num=args.class_num,max_len=args.max_seq_len).to(self.device)

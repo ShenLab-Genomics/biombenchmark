@@ -21,7 +21,13 @@ MAX_SEQ_LEN = {
     "SpTransformer_short": 512,
     'NucleotideTransformer': 9000,
     'NT_Short': 510,
+    "GENA-LM-base": 502,
+    "GENA-LM-large": 502,  # 9000 in real, controled by inner tokenizer
+    "UTRLM": 1024,
+    'UTRLM_short': 512,
 }
+
+available_methods = MAX_SEQ_LEN.keys()
 
 
 def str2list(v):
@@ -39,10 +45,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='')
     parser.add_argument(
-        "--method", choices=['RNAErnie', 'RNAFM', 'RNAMSM', 'DNABERT', 'SpliceBERT', 'SpliceAI', 'SpTransformer',
-                             'RNAErnieRaw', 'SpTransformer_short', 'SpTransformer_raw', 'Pangolin', 'SpliceAI_short',
-                             'NucleotideTransformer',
-                             'NT_Short', 'RNABERT'], default='RNABERT')
+        "--method", choices=available_methods, default='RNABERT')
     parser.add_argument("--num_train_epochs", default=10, type=int)
     parser.add_argument("--batch_size", default=6, type=int)
     parser.add_argument("--num_workers", default=2, type=int)
@@ -75,8 +78,8 @@ if __name__ == '__main__':
     dataset_test = splice_dataset.SpliceNormalDataset(
         h5_filename=args.dataset_test)
 
+    args.max_seq_len = MAX_SEQ_LEN[args.method]
     if (args.method == 'SpliceBERT') or (args.method == 'DNABERT'):
-        args.max_seq_len = MAX_SEQ_LEN[args.method]
         args.replace_T = False
         args.replace_U = True
         tokenizer = AutoTokenizer.from_pretrained(
@@ -205,5 +208,24 @@ if __name__ == '__main__':
         args.replace_U = False
         tokenizer = RNATokenizer(args.vocab_path)
         ev = splice_evaluator.RNABertEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'UTRLM' or args.method == 'UTRLM_short':
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = RNATokenizer(args.vocab_path)
+
+        ev = splice_evaluator.UTRLMEvaluator(
+            args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'GENA-LM-base' or args.method == 'GENA-LM-large':
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path)
+
+        ev = splice_evaluator.GENAEvaluator(
             args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)
