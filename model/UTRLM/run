@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -ex
+
+# This is the master script for the capsule. When you click "Reproducible Run", the code in this file will execute.
+#python -u app.py "$@"
+python MJ3_Finetune_extract_append_predictor_Sample_10fold-lr-huber-DDP.py --label_type rl --epochs 1 --huber_loss --train_file 4.1_train_data_GSM3130435_egfp_unmod_1.csv --prefix ESM2SISS_FS4.1.ep93.1e-2.dr5 --lr 1e-2 --dropout3 0.5 --modelfile ESM2SISS_FS4.1_fiveSpeciesCao_6layers_16heads_128embedsize_4096batchToks_lr1e-05_supervisedweight1.0_structureweight1.0_MLMLossMin_epoch93.pkl --finetune --bos_emb --test1fold

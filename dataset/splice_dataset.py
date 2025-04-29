@@ -68,11 +68,11 @@ class SpTransformerDataset(SpliceDataset):
         """
         Xk, idx = self.idx_to_key[idx]
         Yk = Xk.replace("X", "Y")
-        # X需要转换成one-hot编码
+        # Turn X into one-hot encoding
         X = np.array(self.h5f[Xk][idx])
         X = one_hot_encode(X, IN_MAP)
         X = torch.from_numpy(X).float().transpose(0, 1)  # (L, 4) -> (4, L)
-        # Y不需要特别转换
+        #
         Y = torch.from_numpy(self.h5f[Yk][idx]).float()
         idx = torch.max(Y[3:, :], dim=0)[0] < 0.05  # desired
         Y[0, idx] = 1
@@ -91,11 +91,11 @@ class SpliceBERTDataset(SpliceDataset):
         self.k = dnabert_k
 
     def __getitem__(self, idx):
-        # 需要把输入的one-hot序列转换成Sequence形式
+        # Turn one-hot encoding into normal sequence
         Xk, idx = self.idx_to_key[idx]
         Yk = Xk.replace("X", "Y")
 
-        # X需要转换成碱基字符串
+        # Parse X into nucleotide string
         X = np.array(self.h5f[Xk][idx]).astype('int')
         start = (len(X) - self.max_len)//2
 
@@ -104,7 +104,7 @@ class SpliceBERTDataset(SpliceDataset):
         else:
             X = X[start-1:start+self.max_len+1]  # padding
 
-        # Y不需要特别转换
+        #
         Y = torch.from_numpy(self.h5f[Yk][idx]).float()
         idx = torch.max(Y[3:, :], dim=0)[0] < 0.05  # desired
         Y[0, idx] = 1
@@ -138,16 +138,16 @@ class DNABERT2Dataset(SpliceDataset):
         self.tokenizer = tokenizer
 
     def __getitem__(self, idx):
-        # 需要把输入的one-hot序列转换成Sequence形式
+        # Turn one-hot encoding into normal sequence
         Xk, idx = self.idx_to_key[idx]
         Yk = Xk.replace("X", "Y")
 
-        # X需要转换成碱基字符串
+        # Parse X into nucleotide string
         X = np.array(self.h5f[Xk][idx]).astype('int')
         start = (len(X) - self.max_len)//2
         X = X[start:start+self.max_len]
 
-        # Y不需要特别转换
+        #
         Y = torch.from_numpy(self.h5f[Yk][idx]).float()
         idx = torch.max(Y[3:, :], dim=0)[0] < 0.05  # desired
         Y[0, idx] = 1

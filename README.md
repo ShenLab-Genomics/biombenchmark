@@ -1,103 +1,105 @@
 # biom-benchmark
 
-## Setting up
+## Setup
 
 ### Model Weights
 
-Model configurations and weights should be downloaded and placed in the `model/pretrained/[Model Name]` directory.
+Download model configurations and weights, and place them in `model/pretrained/[Model Name]`.
 
-**RNAFM**:
-The pretrained model can be downloaded from the following link:
+**RNAFM**:  
+Download the pretrained model from:  
 `https://proj.cse.cuhk.edu.hk/rnafm/api/download?filename=RNA-FM_pretrained.pth`
 
-**RNABERT** and **RNAMSM**:
-Model weights can be downloaded from [Link](https://drive.google.com/file/d/10gJBl24OGQ_aZfxtj09dik0rrM4dOk_R/view?usp=sharing) and [Link](https://drive.google.com/file/d/1-Gl9LGjR_dmDfOARrIVvuOmb7w_tJvGA/view?usp=sharing). This link is referenced from [RNAErnie](https://github.com/CatIIIIIIII/RNAErnie_baselines/tree/main).
+**RNABERT** and **RNAMSM**:  
+Download weights from [Link](https://drive.google.com/file/d/10gJBl24OGQ_aZfxtj09dik0rrM4dOk_R/view?usp=sharing) and [Link](https://drive.google.com/file/d/1-Gl9LGjR_dmDfOARrIVvuOmb7w_tJvGA/view?usp=sharing). Referenced from [RNAErnie](https://github.com/CatIIIIIIII/RNAErnie_baselines/tree/main).
 
+**RNAErnie**:  
+We use the PyTorch version of the model provided by the authors:  
+(https://huggingface.co/LLM-EDA/RNAErnie/tree/main)
 
-**RNAErnie**:
-The original model used in the RNAErnie publication is based on the PaddlePaddle framework, which is incompatible with other models. We used the PyTorch version of the model released by the authors. (https://huggingface.co/LLM-EDA/RNAErnie/tree/main)
+**SpliceBERT**:  
+Model weights are available on [Zenodo](https://doi.org/10.5281/zenodo.7995778).
 
-**SpliceBERT**:
-The model weights are available on [Zenodo](https://doi.org/10.5281/zenodo.7995778).
+**DNABERT**:  
+We use the popular [DNA_bert_3](https://huggingface.co/zhihan1996/DNA_bert_3).
 
-**DNABERT**:
-DNABERT provides a series of models using different k-mer settings. We use the most popular version, [DNA_bert_3](https://huggingface.co/zhihan1996/DNA_bert_3).
+**DNABERT2**:  
+Available at [link](https://huggingface.co/zhihan1996/DNABERT-2-117M).
 
-**DNABERT2**:
-The models are available at this [link](https://huggingface.co/zhihan1996/DNABERT-2-117M).
+**GENA-LM**:  
+Available at [link](https://github.com/AIRI-Institute/GENA_LM).
 
-**Nucleotide Transformer**:
-The authors provided a series of models. We use the best version reported in the article, [nucleotide-transformer-v2-500m-multi-species](https://huggingface.co/InstaDeepAI/nucleotide-transformer-v2-500m-multi-species).
+**UTRLM**:  
+The model is available at this [link](https://codeocean.com/capsule/4214075/tree/v1).
+
+**Nucleotide Transformer**:  
+We use the best-reported version: [nucleotide-transformer-v2-500m-multi-species](https://huggingface.co/InstaDeepAI/nucleotide-transformer-v2-500m-multi-species).
+
+We are currently in the process of packaging and uploading all model weights to Google Drive for your convenience. The upload will take some additional time to complete.
 
 ### Hardware Requirements
-All analyses were conducted on a cluster node equipped with 32 CPU cores and 4 Nvidia Tesla A100 40G GPUs. At least one GPU is necessary for executing a single task.
 
-### Software environment
+All analyses were conducted on a cluster node with 32 CPU cores and 4 Nvidia Tesla A100 40G GPUs. At least one GPU is required for a single task.
 
-A Linux system is required.
+### Software Environment
 
-We recommend using conda and pip to manage the software environments:
+A Linux system is required. Use conda and pip to manage dependencies:
 
 ```bash
 conda env create -f environment_1019.yml
 ```
 
-## Run pipelines
+## Running Pipelines
 
-The datasets required for the analyses can be sourced from the Data Availability sections of our previous publications. For convenience, we have also uploaded essential data files to [Google Drive](https://drive.google.com/file/d/18DccTVbd62PdOA8NLh55rdjTSO1faKsI/view?usp=sharing), which you can download and place in the `./dataset` folder.
-All data files should be placed in a subfolder of `./dataset` folder. e.g. `./dataset/m6a_data/`
+### Prepare Datasets
 
-### nRC prediction
+Datasets can be sourced from the manuscript's Data Availability sections. We are preparing a repository to release the code for building final datasets.  
 
-An example script for training and testing the models is provided at `scripts/cls/seq_cls_nRC_1e-4.sh`
+Essential data files are also available on [Google Drive](https://drive.google.com/drive/folders/1bNvG5JRnUmADC1PXzeCQqkrUBtYKKaxu?usp=sharing). Download and place them in `./dataset`.  
+- Datasets for ncRNA, m6a, and MRL are directly available.  
+- For splicing prediction, run `scripts/makedata_splice.sh` to generate the final dataset (~50GB).
 
-### m6A prediction
+### nRC Prediction
 
-An example script for training and testing the models is provided at  `scripts/m6A/m6a_miCLIP_101_1e-4.sh`
+Example script: `scripts/cls/HPC_run_1.sh`.
 
-### Splicing prediction
+### m6A Prediction
 
-Due to its size (over 100GB), the splicing dataset cannot be directly uploaded. Please refer to the Methods section for instructions on how to generate the dataset. We do provide intermediate files through Google Drive to facilitate this process.
+Example script: `scripts/m6A/HPC_run_1.sh`.
 
-1. Run `scripts/makedata_splice.sh` to create datasets. 
-2. An example of training and testing all models is available at `scripts/splice/splice_3.sh`
+### Splicing Prediction
 
-The entire process, depending on the GPU, may require several days to complete.
+1. Run `scripts/makedata_splice.sh` to create datasets.  
+2. Example script: `scripts/splice/HPC_run_1.sh`.
 
-### MRL prediction
+### MRL Prediction
 
-An example of training and testing all models is available at `scripts/mrl/mrl_1e-3.sh`
+Example script: `scripts/mrl/HPC_run_1.sh`.
 
-### Gather results
+### Gather Results
 
-1. We extract the test results from the textual output of the program and compile them into a table. 
+1. Extract test results from program output and compile them into a table.  
+   - Separate stdout and stderr for clarity:  
+   ```bash
+   bash scripts/run_splice_train_test_53.sh > output.txt 2>error_output.txt
+   ```
+   - On Slurm clusters, stdout and stderr are automatically separated.
 
-- For clear output information, we recommend separating standard output from error messages when executing the scripts, for example:
-```bash
-bash scripts/run_splice_train_test_53.sh > output.txt 2>error_output.txt
-```
+2. Convert output to a table using `parse_output.py` in the `analyzer` folder:  
+   ```bash
+   cd analyzer
+   python parse_output.py -i tables/m6a101_4_0.1.txt
+   ```
+   Example output: `analyzer/tables/m6a101_4_0.1_collected_data.csv`.
 
-- Our test was performed on a slurm cluster, thus the outputs could be split easily. An example is available at `scripts/cls/HPC_run_seq_cls_1.sh`
+The generated table serves as input for plotting. See `analyzer/analyze.ipynb` for an example.
 
+## Code Structure
 
-2. Then, to convert the output into a table, run the `parse_output.py` script located in the analyzer folder:
+- `dataset`: Scripts and utilities for dataset creation and loading.  
+- `evaluator`: Functions for model loading, training, and evaluation.  
+- `logs`: Directory for log files.  
+- `model`: Model definitions and implementations.  
+- `scripts`: Reference scripts for running the project.
 
-```bash
-cd analyzer
-python parse_output.py -i analyzer/nRC_1_4.out
-```
-
-The generated table will serve as the source data for subsequent plotting. An example of this process can be found in the Jupyter Notebook located at 'analyzer/analyze.ipynb'.
-
-
-## Code Description
-
-The source code is structured into several folders:
-
-- dataset: Contains scripts and utilities for creating and loading datasets.
-- evaluator: Houses the functionality for loading models, conducting training, and performing evaluations.
-- logs: Designated output directory for all log files.
-- model: Includes the definitions and implementations of the various models used.
-- scripts: Provides reference scripts to guide the execution of the project.
-
-The main entry points of the program are the following Python scripts: `seq_cls.py`, `m6a_cls.py`, `splice_cls.py` and `mrl_pred.py`. These scripts can be customized to accommodate specific testing requirements.
+Main entry points: `seq_cls.py`, `m6a_cls.py`, `splice_cls.py`, and `mrl_pred.py`. Customize these scripts for specific tests.

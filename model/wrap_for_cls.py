@@ -110,3 +110,13 @@ class NTForSeqCls(nn.Module):
     def forward(self, input_ids):
         logits = self.model(input_ids, attention_mask=input_ids > 1).logits
         return logits
+
+class GENAForSeqCls(nn.Module):
+
+    def __init__(self, model):
+        super(GENAForSeqCls, self).__init__()
+        self.model = model
+
+    def forward(self, input_ids):
+        logits = self.model(input_ids, attention_mask=input_ids > 1).logits
+        return logits

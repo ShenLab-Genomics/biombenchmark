@@ -5,11 +5,12 @@ length=$2
 split=$3
 
 traindata=dataset/m6a_data/miCLIP/${length}/${split}_train.fa
-testdata=dataset/m6a_data/miCLIP/${length}/1.0_test.fa
-output_dir=logs/m6a_101_clip_1e-4_${split}
+testdata=dataset/m6a_data/miCLIP/${length}/test.fa
+output_dir=logs/m6a_${length}_clip_${lr_rate}_${split}
 
 echo "Learning rate set to: $lr_rate"
 echo "Split set to: $split"
+echo "Sequence length set to: $length"
 
 common_args=(
     --dataset_train ${traindata}
@@ -19,6 +20,7 @@ common_args=(
     --num_train_epochs 20
     --batch_size 32
     --class_num 2
+    --logging_steps 512
 )
 
 ## RNAFM
@@ -79,26 +81,31 @@ python m6a_cls.py --method SpliceBERT \
     "${common_args[@]}"
 
 # NucleotideTransformer
-echo "NucleotideTransformer" ${lr_rate} ${data_group}
-python seq_cls.py --method NucleotideTransformer \
+python m6a_cls.py --method NucleotideTransformer \
     --model_path 'model/pretrained/NucleotideTransformer2' \
     --use_kmer 0 \
     "${common_args[@]}"
 
 # GENA-LM
-echo "GENA-LM-base" ${lr_rate} ${data_group}
-python seq_cls.py --method GENA-LM-base \
+python m6a_cls.py --method GENA-LM-base \
     --model_path 'model/pretrained/GENA-LM/gena-lm-bert-base-t2t' \
     --use_kmer 0 \
     --pad_token_id 3 \
     "${common_args[@]}"
 
 # GENA-LM
-echo "GENA-LM-large" ${lr_rate} ${data_group}
-python seq_cls.py --method GENA-LM-large \
+python m6a_cls.py --method GENA-LM-large \
     --model_path 'model/pretrained/GENA-LM/gena-lm-bert-large-t2t' \
     --use_kmer 0 \
     --pad_token_id 3 \
+    "${common_args[@]}"
+
+# UTR-LM
+python m6a_cls.py --method UTRLM \
+    --vocab_path 'model/vocabs/UTRLM.txt' \
+    --model_path 'model/UTRLM/model.pt' \
+    --use_kmer 1 \
+    --pad_token_id 0 \
     "${common_args[@]}"
 
 
@@ -110,7 +117,6 @@ python m6a_cls.py --method DeepM6A \
     --dataset_test ${testdata} \
     --batch_size 256 \
     --num_train_epochs 20 \
-    --logging_steps 100 \
     --lr ${lr_rate} \
     --use_kmer 0
 

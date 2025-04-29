@@ -536,7 +536,6 @@ class DNABERTEvaluatorSeqCls(SeqClsEvaluator):
 
 
 class SpliceBERTEvaluatorSeqCls(DNABERTEvaluatorSeqCls):
-    # SpliceBERT和DNABERT结构相同，权重不同
     def __init__(self, args, tokenizer) -> None:
         super().__init__(args, tokenizer=tokenizer)
 

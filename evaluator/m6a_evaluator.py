@@ -248,7 +248,6 @@ class DNABERT2Evaluator(M6APredEvaluator):
 
 
 class SpliceBERTEvaluator(DNABERTEvaluator):
-    # SpliceBERT和DNABERT结构相同，权重不同
     def __init__(self, args, tokenizer) -> None:
         super().__init__(args, tokenizer=tokenizer)
 

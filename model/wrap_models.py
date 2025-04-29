@@ -134,7 +134,7 @@ class RNAFmForReg(RNAFmWrap):
     def forward(self, input_ids):
         input_ids = input_ids[:, 1:]
         output = self.forward_base(input_ids, need_head_weights=False, repr_layers=[
-            12], return_contacts=False)  # TODO:检查need_head_weights
+            12], return_contacts=False)
         representations = output["representations"][12][:, :, :]
         representations = representations.transpose(1, 2)
         logits = self.predictor(representations).squeeze(-1)

@@ -492,11 +492,7 @@ class SpliceCollatorForGENA(BaseCollator):
             # extend labels to the same length as input_ids
             raw_label = data[1]  # shape (channels, seq_len)
 
-            # 根据每个token的长度，把char level的label转换为 token level的label
-            # 这里的label是一个二维的np.array，第一维是通道数，第二维是token的长度
-            # 在token level的label中，每个label是原始labels的按位或
-
-            # 首先求每个token在原始序列中对应的位置
+            # Token-level labeling. If a token contains splice site, then mark the token as 'positive'
             index = 0
             labels = []
             for i in range(len(mid_input_ids)):
@@ -891,4 +887,4 @@ class UTRLMEvaluator(SpliceEvaluator):
             {k.replace('module.', ''): v for k, v in model_weights.items()}, strict=True)
 
         self.model = wrap_models.UTRLMForTokenCls(
-            self.model, class_num=args.class_num,max_len=args.max_seq_len).to(self.device)
+            self.model, class_num=args.class_num, max_len=args.max_seq_len).to(self.device)
