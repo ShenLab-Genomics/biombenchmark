@@ -13,7 +13,7 @@ MAX_SEQ_LEN = {"RNABERT": 440,
                'DNABERT2': 512,
                "SpliceBERT": 512,
                "RNAErnie": 512,
-               "GENA-LM-base": 512,
+               "GENA-LM-base": 512//5,
                "GENA-LM-large": 512//5,
                "UTRLM": 512,
                'NucleotideTransformer': 100,  # 6-mers，
@@ -55,13 +55,14 @@ if __name__ == '__main__':
     parser.add_argument('--metrics', type=str2list,
                         default="F1s,Precision,Recall,Accuracy,Mcc,classwise_acc,classwise_prauc",)  # optional: Emb
     parser.add_argument("--extract_emb", default=False)
+    parser.add_argument("--seed", default=2024, type=int)
 
     args = parser.parse_args()
 
     assert args.output_dir, "output_dir is required."
 
     ###
-    seed = 2024
+    seed = args.seed
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     ###
@@ -80,9 +81,9 @@ if __name__ == '__main__':
             fasta_dir=args.dataset, prefix=args.data_group, train=False)
     else:
         dataset_train = seq_cls_dataset.SeqClsDatasetOneHot(
-            fasta_dir=args.dataset, prefix=args.data_group,rnafold=True)
+            fasta_dir=args.dataset, prefix=args.data_group, rnafold=True)
         dataset_test = seq_cls_dataset.SeqClsDatasetOneHot(
-            fasta_dir=args.dataset, prefix=args.data_group, train=False,rnafold=True)
+            fasta_dir=args.dataset, prefix=args.data_group, train=False, rnafold=True)
 
     #
 

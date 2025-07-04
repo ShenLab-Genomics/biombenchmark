@@ -19,6 +19,7 @@ MAX_SEQ_LEN = {"RNABERT": 440,
                "UTRLM": 512,
                "DeepM6A": 101,
                "bCNNMethylpred": 101,
+               "HyenaDNA": 512,
                }
 available_methods = MAX_SEQ_LEN.keys()
 
@@ -54,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument("--pad_token_id", default=0, type=int)
     parser.add_argument("--dataset_train", type=str)
     parser.add_argument("--dataset_test", type=str)
+    parser.add_argument("--extra_eval", type=str, default=None)
     parser.add_argument('--metrics', type=str2list,
                         default="F1s,Precision,Recall,Accuracy,Mcc,pr_auc,auc",)
 
@@ -186,4 +188,13 @@ if __name__ == '__main__':
 
         ev = m6a_evaluator.UTRLMEvaluator(
             args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'HyenaDNA':
+        args.max_seq_len = MAX_SEQ_LEN["HyenaDNA"]
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
+
+        ev = m6a_evaluator.HyenaDNAEvaluator(args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)

@@ -1,25 +1,24 @@
 #!bash
 
 lr_rate=$1
-class_num=$2
-pass=$3
-seed=$4
-
-trainset=dataset/splice_data/gtex_500_${class_num}tis/dataset_train.h5
-testset=dataset/splice_data/gtex_500_${class_num}tis/dataset_test.h5
+pass=$2
+seed=$3
+class_num=3
+trainset='dataset/splice_data/gtex_500_15tis_small/dataset_train_small.h5'
+testset='dataset/splice_data/gtex_500_15tis/dataset_test.h5'
 
 echo "Learning rate set to: $lr_rate"
 
 common_args=(
-    --output_dir model/fine_tuned/Splicing/${class_num}_class_${lr_rate}_${pass}
+    --output_dir model/fine_tuned/Splicing/${class_num}_class_small_${lr_rate}_${pass}
     --num_train_epochs 10
     --batch_size 12
     --logging_steps 512
     --class_num ${class_num}
     --lr ${lr_rate}
-    --dataset_train ${trainset}
-    --dataset_test ${testset}
-    --seed ${seed}
+    --dataset_train ${trainset} \
+    --dataset_test ${testset} \
+    --seed ${seed} \
 )
 
 ## RNAFM
@@ -75,6 +74,11 @@ python seq_cls.py --method NucleotideTransformer \
     --class_num ${class_num} \
     --lr ${lr_rate} \
     --use_kmer -10 
+
+echo "SpliceAI"
+python splice_cls.py --method SpliceAI \
+    --use_kmer 0 \
+    "${common_args[@]}"
 
 echo "GENA-LM-base"
 python seq_cls.py --method GENA-LM-base \

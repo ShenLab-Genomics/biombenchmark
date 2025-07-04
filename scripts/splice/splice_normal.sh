@@ -1,6 +1,8 @@
 #!bash
 
 lr_rate=$1
+pass=$2
+seed=$3
 class_num=3
 trainset='dataset/splice_data/gtex_500_15tis/dataset_train.h5'
 testset='dataset/splice_data/gtex_500_15tis/dataset_test.h5'
@@ -8,7 +10,7 @@ testset='dataset/splice_data/gtex_500_15tis/dataset_test.h5'
 echo "Learning rate set to: $lr_rate"
 
 common_args=(
-    --output_dir model/fine_tuned/Splicing/${class_num}class_${lr_rate}
+    --output_dir model/fine_tuned/Splicing/${class_num}class_${lr_rate}_${pass}
     --num_train_epochs 10
     --batch_size 12
     --logging_steps 512
@@ -16,36 +18,42 @@ common_args=(
     --lr ${lr_rate}
     --dataset_train ${trainset} \
     --dataset_test ${testset} \
+    --seed ${seed} \
 )
+
 
 ## RNAFM
 echo "RNAFM"
-python seq_cls.py --method RNAFM \
+python splice_cls.py --method RNAFM \
     --vocab_path 'model/vocabs/RNAFM.txt' \
     --model_path 'model/pretrained/RNAFM/RNA-FM_pretrained.pth' \
+    --model_config 'model/configs/RNAFM.json' \
+    --use_kmer 1 \
     "${common_args[@]}"
 
 ## RNAMSM
 echo "RNAMSM"
-python seq_cls.py --method RNAMSM \
+python splice_cls.py --method RNAMSM \
     --vocab_path 'model/vocabs/RNAMSM.txt' \
     --model_path 'model/pretrained/RNAMSM/RNAMSM.pth' \
     --model_config 'model/configs/RNAMSM.json' \
     --pad_token_id 1 \
+    --use_kmer 1 \
     "${common_args[@]}"
 
 
 # RNAErnie
 echo "RNAErnie"
-python seq_cls.py --method RNAErnie \
+python splice_cls.py --method RNAErnie \
     --model_path 'model/pretrained/rnaernie' \
     --use_kmer 0 \
     "${common_args[@]}"
 
 ## SpliceBERT
 echo "SpliceBERT"
-python seq_cls.py --method SpliceBERT \
+python splice_cls.py --method SpliceBERT \
     --model_path 'model/pretrained/SpliceBERT/models/SpliceBERT.510nt' \
+    --use_kmer 1 \
     "${common_args[@]}"
 
 
@@ -63,9 +71,9 @@ python splice_cls.py --method SpTransformer_short \
 
 # using special batch size
 echo "NucleotideTransformer"
-python seq_cls.py --method NucleotideTransformer \
+python splice_cls.py --method NucleotideTransformer \
     --model_path 'model/pretrained/NucleotideTransformer2' \
-    --output_dir model/fine_tuned/Splicing/${class_num}class_${lr_rate} \
+    --output_dir model/fine_tuned/Splicing/${class_num}class_${lr_rate}_${pass} \
     --dataset_train ${trainset} \
     --dataset_test ${testset} \
     --num_train_epochs 10 \
@@ -78,7 +86,7 @@ python seq_cls.py --method NucleotideTransformer \
 echo "NucleotideTransformer-short"
 python splice_cls.py --method NT_Short \
     --model_path 'model/pretrained/NucleotideTransformer2' \
-    --output_dir model/fine_tuned/Splicing/${class_num}class_${lr_rate} \
+    --output_dir model/fine_tuned/Splicing/${class_num}class_${lr_rate}_short_${pass} \
     --dataset_train ${trainset} \
     --dataset_test ${testset} \
     --num_train_epochs 10 \
@@ -92,29 +100,43 @@ python splice_cls.py --method SpliceAI \
     --use_kmer 0 \
     "${common_args[@]}"
 
+echo "SpliceAI_short"
 python splice_cls.py --method SpliceAI_short \
-    --use_kmer 0
+    --use_kmer 0 \
     "${common_args[@]}"
 
 echo "GENA-LM-base"
-python seq_cls.py --method GENA-LM-base \
+python splice_cls.py --method GENA-LM-base \
     --model_path 'model/pretrained/GENA-LM/gena-lm-bert-base-t2t' \
     --use_kmer 0 \
     --pad_token_id 3 \
     "${common_args[@]}"
 
 echo "GENA-LM-large"
-python seq_cls.py --method GENA-LM-large \
+python splice_cls.py --method GENA-LM-large \
     --model_path 'model/pretrained/GENA-LM/gena-lm-bert-large-t2t' \
     --use_kmer 0 \
     --pad_token_id 3 \
     "${common_args[@]}"
 
 echo "UTRLM"
-python seq_cls.py --method UTRLM \
+python splice_cls.py --method UTRLM \
     --vocab_path 'model/vocabs/UTRLM.txt' \
     --model_path 'model/UTRLM/model.pt' \
     --use_kmer 1 \
     --pad_token_id 0 \
     "${common_args[@]}"
 
+echo "HyenaDNA"
+python splice_cls.py --method HyenaDNA \
+    --model_path 'model/pretrained/hyenadna-small-32k-seqlen' \
+    --use_kmer 0 \
+    --pad_token_id 4 \
+    "${common_args[@]}"
+
+echo "HyenaDNA_short"
+python splice_cls.py --method HyenaDNA_short \
+    --model_path 'model/pretrained/hyenadna-small-32k-seqlen' \
+    --use_kmer 0 \
+    --pad_token_id 4 \
+    "${common_args[@]}"

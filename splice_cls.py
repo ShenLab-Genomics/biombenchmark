@@ -25,6 +25,8 @@ MAX_SEQ_LEN = {
     "GENA-LM-large": 502,  # 9000 in real, controled by inner tokenizer
     "UTRLM": 1024,
     'UTRLM_short': 512,
+    "HyenaDNA": 9000,
+    "HyenaDNA_short": 512,
 }
 
 available_methods = MAX_SEQ_LEN.keys()
@@ -62,13 +64,14 @@ if __name__ == '__main__':
     parser.add_argument("--dataset_test", type=str)
     parser.add_argument('--metrics', type=str2list,
                         default="topk,pr_auc,roc_auc",)
+    parser.add_argument("--seed", default=2024, type=int)
 
     args = parser.parse_args()
 
     assert args.output_dir, "output_dir is required."
 
     ###
-    seed = 2024
+    seed = args.seed
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     ###
@@ -228,4 +231,19 @@ if __name__ == '__main__':
 
         ev = splice_evaluator.GENAEvaluator(
             args, tokenizer=tokenizer)
+        ev.run(args, dataset_train, dataset_test)
+
+    if args.method == 'HyenaDNA' or args.method == 'HyenaDNA_short':
+        args.replace_T = False
+        args.replace_U = True
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model_path,
+            trust_remote_code=True,
+        )
+        if args.method == 'HyenaDNA':
+            ev = splice_evaluator.HyenaDNAEvaluator(
+                args, tokenizer=tokenizer)
+        elif args.method == 'HyenaDNA_short':
+            ev = splice_evaluator.HyenaDNAShortEvaluator(
+                args, tokenizer=tokenizer)
         ev.run(args, dataset_train, dataset_test)

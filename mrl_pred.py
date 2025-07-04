@@ -57,11 +57,13 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", type=str)
     parser.add_argument('--metrics', type=str2list,
                         default="MAE,MSE,R2,pearson,spearman")
+    parser.add_argument("--extract_emb", default=False)
+    parser.add_argument("--seed", default=2024, type=int)
 
     args = parser.parse_args()
 
     ###
-    seed = 2024
+    seed = args.seed
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     ###
