@@ -35,7 +35,7 @@ The model is available at this [link](https://codeocean.com/capsule/4214075/tree
 **Nucleotide Transformer**:  
 We use the best-reported version: [nucleotide-transformer-v2-500m-multi-species](https://huggingface.co/InstaDeepAI/nucleotide-transformer-v2-500m-multi-species).
 
-We are currently in the process of packaging and uploading all model weights to Google Drive for your convenience. The upload will take some additional time to complete.
+>We are currently in the process of packaging and uploading all model weights to Google Drive for your convenience. The upload will take some additional time to complete.
 
 ### Hardware Requirements
 
@@ -46,7 +46,7 @@ All analyses were conducted on a cluster node with 32 CPU cores and 4 Nvidia Tes
 A Linux system is required. Use conda and pip to manage dependencies:
 
 ```bash
-conda env create -f environment_1019.yml
+conda env create -f environment.yml
 ```
 
 ## Running Pipelines
