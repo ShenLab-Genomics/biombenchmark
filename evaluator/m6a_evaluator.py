@@ -1,5 +1,4 @@
 import os
-from tqdm import tqdm
 import torch
 import numpy as np
 from evaluator.seq_cls_evaluator import SeqClsTrainer, SeqClsCollator
@@ -13,6 +12,7 @@ from model.GENA import modeling_bert as GENA
 # from model.wrap_for_cls import DNABERTForSeqCls, RNAErnieForSeqCls, RNABertForSeqCls, DNABERT2ForSeqCls, RNAMsmForSeqCls, RNAFmForSeqCls, SeqClsLoss,NTForSeqCls
 from model import wrap_models
 import model.DeepM6ASeq
+from dataset import m6a_dataset
 from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from evaluator.base_evaluator import BaseMetrics, BaseCollator, BaseTrainer
@@ -53,9 +53,9 @@ class M6APredMetrics(BaseMetrics):
         labels = labels.cpu().numpy().astype('int32')
         # pred_score = torch.log_softmax(
         #     outputs, dim=-1).cpu().numpy()
-        pred_score = torch.softmax(outputs, dim=-1).cpu().numpy()
+        pred_score = torch.softmax(outputs, dim=-1).to(torch.float).cpu().numpy()
         pred_class = torch.argmax(
-            outputs, axis=-1).cpu().numpy()
+            outputs, dim=-1).cpu().numpy()
 
         res = {}
         for name in self.metrics:
@@ -179,12 +179,19 @@ class M6APredEvaluator():
             optimizer=self._optimizer,
             compute_metrics=self._metric,
         )
+        ## add extra evaluation
+        if args.extra_eval:
+            extra_data = m6a_dataset.M6ADataset(fasta_dir=args.extra_eval)
+            self.seq_cls_trainer.extra_dataloader = self.seq_cls_trainer._get_dataloader(extra_data)
+        ##
         for i_epoch in range(args.num_train_epochs):
             print("Epoch: {}".format(i_epoch))
             self.seq_cls_trainer.train(i_epoch)
             # record performance on train set to check overfitting
             self.seq_cls_trainer.eval(i_epoch, info="Train_set")
             self.seq_cls_trainer.eval(i_epoch)
+            if args.extra_eval:
+                self.seq_cls_trainer.eval(i_epoch, info="Extra_set")
             if (i_epoch == 0) or ((i_epoch+1) % 5 == 0):
                 try:
                     self.seq_cls_trainer.save_model(
@@ -418,3 +425,12 @@ class UTRLMEvaluator(M6APredEvaluator):
         # print("Trainable parameters: {}".format(trainable_params))
         self.model = wrap_models.UTRLMForSeqCls(
             self.model, class_num=2).to(self.device)
+
+
+class HyenaDNAEvaluator(M6APredEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        print(self.device)
+        print(torch.cuda.current_device())
+        model = AutoModelForSequenceClassification.from_pretrained(args.model_path, torch_dtype=torch.bfloat16, trust_remote_code=True, num_labels=2)
+        self.model = wrap_models.HyenaDNAForSeqCls(model).to(self.device)

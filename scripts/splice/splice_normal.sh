@@ -63,7 +63,7 @@ python splice_cls.py --method SpTransformer \
     --use_kmer 0 \
     "${common_args[@]}"
 
-echo "SpTransformer"
+echo "SpTransformer-short"
 python splice_cls.py --method SpTransformer_short \
     --model_path 'model/pretrained/SpTransformer/weight.ckpt' \
     --use_kmer 0 \
@@ -125,18 +125,4 @@ python splice_cls.py --method UTRLM \
     --model_path 'model/UTRLM/model.pt' \
     --use_kmer 1 \
     --pad_token_id 0 \
-    "${common_args[@]}"
-
-echo "HyenaDNA"
-python splice_cls.py --method HyenaDNA \
-    --model_path 'model/pretrained/hyenadna-small-32k-seqlen' \
-    --use_kmer 0 \
-    --pad_token_id 4 \
-    "${common_args[@]}"
-
-echo "HyenaDNA_short"
-python splice_cls.py --method HyenaDNA_short \
-    --model_path 'model/pretrained/hyenadna-small-32k-seqlen' \
-    --use_kmer 0 \
-    --pad_token_id 4 \
     "${common_args[@]}"

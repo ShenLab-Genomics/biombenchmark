@@ -55,6 +55,11 @@ LABEL2ID = {
         "piRNA": 14,
         "circRNA": 15
     },
+    "index": {
+        "0": 0,
+        "1": 1,
+        "2": 2
+    }
 }
 
 
@@ -140,7 +145,8 @@ class SeqClsMetrics(BaseMetrics):
     @staticmethod
     def classwise_acc(preds, labels):
         """
-        For multi-class classification, calculate the class-wise accuracy.
+        For multi-class classification, calculate the class-wise accuracy. 
+        # Actually it calculates the recall of each class.
         """
         num_classes = len(np.unique(labels))
         classwise_acc = []
@@ -362,6 +368,8 @@ class SeqClsTrainer(BaseTrainer):
         target_dataloader = self.eval_dataloader
         if info == "Train_set":
             target_dataloader = self.train_dataloader
+        if info == "Extra_set" and self.extra_dataloader is not None:
+            target_dataloader = self.extra_dataloader
 
         with tqdm(total=len(target_dataloader.dataset), mininterval=5) as pbar:
             outputs_dataset, labels_dataset = [], []
@@ -630,3 +638,9 @@ class ncRDenseEvaluator(SeqClsEvaluator):
             p.numel() for p in self.model.parameters() if p.requires_grad
         )
         print("Trainable parameters: {}".format(trainable_params))
+
+class HyenaDNAEvaluator(SeqClsEvaluator):
+    def __init__(self, args, tokenizer) -> None:
+        super().__init__(tokenizer=tokenizer)
+        self.model = AutoModelForSequenceClassification.from_pretrained(args.model_path, num_labels=args.class_num, trust_remote_code=True)
+        self.model = wrap_models.HyenaDNAForSeqCls(self.model).to(self.device)

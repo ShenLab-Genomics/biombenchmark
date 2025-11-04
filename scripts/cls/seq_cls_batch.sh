@@ -3,17 +3,20 @@
 lr_rate=$1
 data_group=$2
 class_num=$3
+pass=$4
+seed=$5
 echo "Learning rate set to: $lr_rate"
 
 common_args=(
     --dataset dataset/seq_cls_data
     --data_group ${data_group}
-    --output_dir logs/nRC_${lr_rate}_${data_group}
+    --output_dir logs/nRC_${lr_rate}_${data_group}_${pass}
     --num_train_epochs 30
     --batch_size 40
     --logging_steps 512
     --class_num ${class_num}
     --lr ${lr_rate}
+    --seed ${seed}
 )
 
 ## RNAFM

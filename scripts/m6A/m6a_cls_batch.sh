@@ -3,10 +3,12 @@
 lr_rate=$1
 length=$2
 split=$3
+pass=$4
+seed=$5
 
 traindata=dataset/m6a_data/miCLIP/${length}/${split}_train.fa
 testdata=dataset/m6a_data/miCLIP/${length}/test.fa
-output_dir=logs/m6a_${length}_clip_${lr_rate}_${split}
+output_dir=logs/m6a_${length}_clip_${lr_rate}_${split}_${pass}_${seed}
 
 echo "Learning rate set to: $lr_rate"
 echo "Split set to: $split"
@@ -21,6 +23,8 @@ common_args=(
     --batch_size 32
     --class_num 2
     --logging_steps 512
+    --seed ${seed}
+    --extra_eval dataset/m6a_data/miCLIP/${length}/unbalanced_test.fa
 )
 
 ## RNAFM

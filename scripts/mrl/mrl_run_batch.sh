@@ -2,9 +2,11 @@
 
 lr_rate=$1
 freeze=$2
+pass=$3
+seed=$4
 
 dataset=dataset/mrl_data/mpra_data_varlen.csv
-output_dir=logs/mrl_${lr_rate}_freeze${freeze}
+output_dir=logs/mrl_${lr_rate}_freeze${freeze}_${pass}
 
 echo "Learning rate set to: $lr_rate"
 echo "Freeze base: $freeze"
@@ -17,6 +19,7 @@ common_args=(
     --batch_size 64
     --logging_steps 512
     --freeze_base ${freeze}
+    --seed ${seed}
 )
 
 ## RNAFM
@@ -86,12 +89,14 @@ python mrl_pred.py --method SpliceBERT \
     "${common_args[@]}"
 
 # NucleotideTransformer
+echo "NucleotideTransformer"
 python mrl_pred.py --method NucleotideTransformer \
     --model_path 'model/pretrained/NucleotideTransformer2' \
     --use_kmer 0 \
     "${common_args[@]}"
 
 # GENA-LM
+echo "GENA-LM-base"
 python mrl_pred.py --method GENA-LM-base \
     --model_path 'model/pretrained/GENA-LM/gena-lm-bert-base-t2t' \
     --use_kmer 0 \
@@ -99,6 +104,7 @@ python mrl_pred.py --method GENA-LM-base \
     "${common_args[@]}"
 
 # GENA-LM
+echo "GENA-LM-large"
 python mrl_pred.py --method GENA-LM-large \
     --model_path 'model/pretrained/GENA-LM/gena-lm-bert-large-t2t' \
     --use_kmer 0 \
@@ -109,7 +115,7 @@ python mrl_pred.py --method GENA-LM-large \
 echo "UTRLM"
 python mrl_pred.py --method UTRLM \
     --vocab_path 'model/vocabs/UTRLM.txt' \
-    --model_path 'model/UTRlm/model.pt' \
+    --model_path 'model/UTRLM/model.pt' \
     --use_kmer 1 \
     "${common_args[@]}"
 

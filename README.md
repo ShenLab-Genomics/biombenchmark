@@ -103,3 +103,7 @@ The generated table serves as input for plotting. See `analyzer/analyze.ipynb` f
 - `scripts`: Reference scripts for running the project.
 
 Main entry points: `seq_cls.py`, `m6a_cls.py`, `splice_cls.py`, and `mrl_pred.py`. Customize these scripts for specific tests.
+
+## Analysis
+
+The Jupyter Notebook `analyzer/analyze.ipynb` provides a basic framework for visualizing the analysis results. Some additional analyses incorporated during the paper's revision process may not yet be reflected in the file. We plan to update it shortly.
