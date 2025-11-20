@@ -701,16 +701,16 @@ class NTEvaluator(SpliceEvaluator):
             self.model, num_labels=args.class_num).to(self.device)
         self.mode = 'token'
 
-        # manually load trained .pt file
-        if args.class_num == 15:
-            self.model.load_state_dict(
-                torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_15class_1e-4/epoch_4_model_state.pt'))
-        if args.class_num == 53:
-            self.model.load_state_dict(
-                torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_53class_1e-4/epoch_4_model_state.pt'))
-        if args.class_num == 3:
-            self.model.load_state_dict(
-                torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_3class_1e-4/epoch_4_model_state.pt'))
+        # # DEBUG: manually load trained .pt file
+        # if args.class_num == 15:
+        #     self.model.load_state_dict(
+        #         torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_15class_1e-4/epoch_4_model_state.pt'))
+        # if args.class_num == 53:
+        #     self.model.load_state_dict(
+        #         torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_53class_1e-4/epoch_4_model_state.pt'))
+        # if args.class_num == 3:
+        #     self.model.load_state_dict(
+        #         torch.load('/public/home/shenninggroup/yny/code/biombenchmark/model/fine_tuned/Splicing/NT_3class_1e-4/epoch_4_model_state.pt'))
 
 
 class NTShortEvaluator(SpliceEvaluator):
